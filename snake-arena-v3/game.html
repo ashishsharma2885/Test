@@ -10,7 +10,8 @@
   --navy:#071a33;--navy2:#0d2d55;--blue:#2e7ed6;--blue2:#58a9ff;
   --cyan:#57e7ff;--green:#47e77f;--green2:#18b952;--gold:#ffd84a;
   --red:#ff596a;--panel:rgba(8,30,56,.96);--panel2:rgba(23,72,124,.95);
-  --text:#f5fbff;--muted:#b8cde0;--stroke:rgba(255,255,255,.12)
+  --text:#f5fbff;--muted:#b8cde0;--stroke:rgba(255,255,255,.12);
+  --menuScale:.92;--safeX:6px;--safeY:4px
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#06111d;font-family:Arial,Helvetica,sans-serif;color:var(--text);touch-action:none;overscroll-behavior:none}
@@ -18,7 +19,7 @@ button{font:inherit}
 .screen{position:fixed;inset:0;display:none;overflow:hidden;background:
 radial-gradient(circle at 50% 25%,#163c69 0,#0a274a 40%,#06192f 72%,#04101f 100%)}
 .screen.active{display:block}
-.topbar{height:72px;background:linear-gradient(180deg,#173a78,#102d64);border-bottom:3px solid rgba(111,184,255,.38);display:flex;align-items:center;padding:0 18px;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,.28)}
+.topbar{height:72px;background:linear-gradient(180deg,#173a78,#102d64);border-bottom:3px solid rgba(111,184,255,.38);display:flex;align-items:center;padding:0 calc(18px + var(--safeX));gap:12px;box-shadow:0 8px 24px rgba(0,0,0,.28)}
 .brandTitle{font-size:30px;font-weight:1000;color:#fff36b;text-shadow:0 3px 0 rgba(0,0,0,.28);letter-spacing:.01em}
 .wallet{margin-left:auto;display:flex;align-items:center;gap:8px;background:rgba(2,12,32,.6);border-radius:18px;padding:7px 12px;border:1px solid rgba(255,255,255,.08);font-weight:900;font-size:20px}
 .coinIcon{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,#fff585,#ffc400 55%,#da8a00);border:3px solid #ffdc45;box-shadow:0 3px 8px rgba(0,0,0,.35);color:#8a5100;font-size:18px}
@@ -30,10 +31,10 @@ radial-gradient(circle at 50% 25%,#163c69 0,#0a274a 40%,#06192f 72%,#04101f 100%
 .secondary{background:linear-gradient(#55aefd,#2677c9);border:2px solid #9bd3ff;border-radius:14px;padding:11px 20px;box-shadow:0 4px 0 #154c86}
 .panel{background:linear-gradient(180deg,rgba(47,118,198,.92),rgba(25,73,130,.94));border:2px solid rgba(155,210,255,.35);border-radius:18px;box-shadow:0 14px 35px rgba(0,0,0,.28)}
 .card{background:linear-gradient(180deg,#3b8be0,#276cbc);border:2px solid #79baff;border-radius:16px;box-shadow:inset 0 1px rgba(255,255,255,.18),0 5px 12px rgba(0,0,0,.2)}
-.tabs{height:58px;padding:0 20px;display:flex;align-items:flex-end;gap:8px;background:rgba(20,66,123,.85);border-bottom:2px solid rgba(120,191,255,.28)}
+.tabs{height:58px;padding:0 calc(20px + var(--safeX));display:flex;align-items:flex-end;gap:8px;background:rgba(20,66,123,.85);border-bottom:2px solid rgba(120,191,255,.28);overflow-x:auto;overflow-y:hidden}
 .tabBtn{height:50px;min-width:135px;padding:0 18px;border-radius:14px 14px 0 0;background:linear-gradient(#427fca,#2c64ad);font-size:18px;color:#d9ecff}
 .tabBtn.active{background:linear-gradient(#69a9ee,#4285d1);color:#fff15b}
-.content{height:calc(100vh - 130px);padding:16px;overflow:auto}
+.content{height:calc(100vh - 130px);padding:calc(16px + var(--safeY)) calc(16px + var(--safeX));overflow:auto}
 .muted{color:var(--muted)}
 .yellow{color:#fff15d}
 .good{color:#77ff9c}
@@ -46,7 +47,7 @@ radial-gradient(circle at 50% 25%,#163c69 0,#0a274a 40%,#06192f 72%,#04101f 100%
 radial-gradient(circle at 50% 42%,rgba(38,95,140,.34),transparent 35%),
 linear-gradient(#08111b,#071018)}
 #lobby:before{content:"";position:absolute;inset:0;opacity:.14;background-image:radial-gradient(circle,#6f8aa0 1px,transparent 1px);background-size:34px 34px}
-.lobbyHUD{position:relative;z-index:2;height:100%;display:grid;grid-template-columns:190px 1fr 190px;grid-template-rows:90px 1fr 92px;gap:10px;padding:12px}
+.lobbyHUD{position:absolute;z-index:2;inset:var(--safeY) var(--safeX);display:grid;grid-template-columns:190px minmax(300px,1fr) 190px;grid-template-rows:90px minmax(0,1fr) 92px;gap:10px;padding:12px;transform:scale(var(--menuScale));transform-origin:center center;transition:transform .18s ease}
 .profileChip{grid-column:1;grid-row:1;display:flex;gap:10px;align-items:center;padding:10px 12px;background:linear-gradient(#ba6a0e,#7d3d05);border:3px solid #ffd44d;border-radius:18px;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:pointer}
 .avatar{width:54px;height:54px;border-radius:15px;background:radial-gradient(circle at 35% 30%,#6ef4ff,#2b70bd);display:flex;align-items:center;justify-content:center;font-size:30px;border:2px solid white}
 .levelBox{font-size:12px;flex:1}.levelBox b{font-size:18px}
@@ -99,8 +100,14 @@ linear-gradient(#08111b,#071018)}
 .previewArena .foodDot{position:absolute;font-size:26px}
 .controlDemo{position:absolute;inset:0;pointer-events:none}.demoJoy,.demoBoost{position:absolute;bottom:22px;width:86px;height:86px;border-radius:50%;border:3px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-weight:1000}
 .demoJoy{left:22px;background:rgba(69,182,255,.25)}.demoBoost{right:22px;background:rgba(43,224,93,.25)}
-.sliderRow{display:grid;grid-template-columns:150px 1fr 60px;gap:10px;align-items:center;margin:12px 0}
+.sliderRow{display:grid;grid-template-columns:150px 1fr 72px;gap:10px;align-items:center;margin:12px 0}
 input[type=range]{width:100%}
+.displayPreview{height:280px;border:3px solid #79baff;border-radius:18px;background:#071421;position:relative;overflow:hidden}
+.displaySafe{position:absolute;border:2px dashed rgba(116,255,139,.8);border-radius:12px;background:rgba(80,220,130,.06);display:flex;align-items:center;justify-content:center;color:#aaffba;font-weight:900;text-align:center}
+.displayMock{width:88%;height:72%;border-radius:14px;background:linear-gradient(135deg,#1f4f88,#0b2748);display:grid;grid-template-columns:110px 1fr 110px;grid-template-rows:58px 1fr 52px;gap:6px;padding:8px;box-shadow:0 8px 22px rgba(0,0,0,.35)}
+.displayMock div{background:rgba(77,164,240,.3);border:1px solid rgba(180,225,255,.24);border-radius:9px}
+.displayMock .mockCenter{grid-column:2;grid-row:1/3;background:rgba(85,231,127,.16)}
+.displayMock .mockBottom{grid-column:1/4;grid-row:3}
 .modal{position:fixed;inset:0;display:none;z-index:50;background:rgba(0,0,0,.68);align-items:center;justify-content:center}
 .modal.show{display:flex}.modalBox{width:min(720px,90vw);max-height:86vh;overflow:auto;padding:20px}
 .rewardDays{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.rewardDay{padding:12px 5px;text-align:center;min-height:96px}.rewardDay.current{outline:4px solid #7aff70}
@@ -129,6 +136,16 @@ input[type=range]{width:100%}
 .coinPulse{animation:walletPulse .32s}@keyframes walletPulse{50%{transform:scale(1.14)}}
 .postGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.postStat{padding:12px;text-align:center}.postStat strong{display:block;font-size:23px;color:#fff15b}
 #emoteBubble{position:absolute;display:none;z-index:8;font-size:34px;filter:drop-shadow(0 3px 4px #000);pointer-events:none}
+@media(max-width:920px){
+  .lobbyHUD{grid-template-columns:160px minmax(260px,1fr) 160px;gap:7px;padding:8px}
+  .sideBtn{height:50px;font-size:12px;padding:0 9px}.navBtn{width:105px;font-size:12px}
+  .profileChip{padding:7px 9px}.wallet{font-size:16px}.logoText{font-size:34px}
+}
+@media(max-width:760px){
+  .lobbyHUD{grid-template-columns:140px minmax(230px,1fr) 140px}
+  .sideBtn{height:46px}.navBtn{width:92px;height:50px}.navBtn span{font-size:18px}
+  .quickRight,.sideMenu{gap:7px}
+}
 @media(max-height:430px){
   .topbar{height:60px}.brandTitle{font-size:25px}.tabs{height:50px}.tabBtn{height:44px;font-size:15px}.content{height:calc(100vh - 110px);padding:10px}
   .lobbyHUD{grid-template-columns:170px 1fr 170px;grid-template-rows:75px 1fr 78px}.logoText{font-size:32px}.snakePreview{height:92px}.navBtn{height:54px;width:110px}
@@ -220,6 +237,7 @@ input[type=range]{width:100%}
   <div class="topbar"><div class="brandTitle">Settings</div><div class="wallet"><span class="coinIcon">●</span><span class="coinBalance">0</span></div><button class="closeBtn" onclick="showScreen('lobby')">×</button></div>
   <div class="tabs">
     <button id="settingsTab-controls" class="tabBtn active" onclick="setSettingsTab('controls')">🎮 Controls</button>
+    <button id="settingsTab-display" class="tabBtn" onclick="setSettingsTab('display')">📱 Display</button>
     <button id="settingsTab-arena" class="tabBtn" onclick="setSettingsTab('arena')">🖼️ Arena</button>
     <button id="settingsTab-food" class="tabBtn" onclick="setSettingsTab('food')">🍎 Food</button>
     <button id="settingsTab-emotes" class="tabBtn" onclick="setSettingsTab('emotes')">😀 Emotes</button>
@@ -386,7 +404,8 @@ function defaultData(){
   ownedFood:['fruit'],selectedFood:'fruit',
   ownedEmotes:['happy'],selectedEmote:'happy',
   upgrades:{speed:1,magnet:1,coin:1,food:1,mobility:1,boostDuration:1,boostRecovery:1,radar:1},
-  controls:{mode:'joystick',handed:'left',size:1,sensitivity:1},
+  controls:{mode:'joystick',handed:'left',size:1,sensitivity:1,joyX:0,joyY:0},
+  display:{scale:.92,safeX:6,safeY:4},
   sound:true,
   daily:{lastClaim:'',streak:0},
   missions:{date:'',fruits:0,bots:0,survival:0,coins:0,maxLength:0,claimed:{}}
@@ -402,6 +421,7 @@ function loadData(){
    d.stats=Object.assign(defaultData().stats,raw.stats||{});
    d.upgrades=Object.assign(defaultData().upgrades,raw.upgrades||{});
    d.controls=Object.assign(defaultData().controls,raw.controls||{});
+   d.display=Object.assign(defaultData().display,raw.display||{});
    d.daily=Object.assign(defaultData().daily,raw.daily||{});
    d.missions=Object.assign(defaultData().missions,raw.missions||{});
   }
@@ -448,6 +468,7 @@ function currentFoodTheme(){return FOOD_THEMES.find(function(s){return s.id===da
 function currentEmote(){return EMOTES.find(function(s){return s.id===data.selectedEmote})||EMOTES[0]}
 
 function showScreen(id){
+ applyDisplaySettings();
  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
  $(id).classList.add('active');
  if(id==='lobby')renderLobby();
@@ -539,8 +560,9 @@ function buyUpgrade(id){
 let settingsTab='controls';
 function setSettingsTab(t){settingsTab=t;renderSettings()}
 function renderSettings(){
- refreshWallet();['controls','arena','food','emotes','sound'].forEach(function(t){$('settingsTab-'+t).classList.toggle('active',t===settingsTab)});
+ refreshWallet();['controls','display','arena','food','emotes','sound'].forEach(function(t){$('settingsTab-'+t).classList.toggle('active',t===settingsTab)});
  if(settingsTab==='controls')renderControlSettings();
+ if(settingsTab==='display')renderDisplaySettings();
  if(settingsTab==='arena')renderArenaSettings();
  if(settingsTab==='food')renderFoodSettings();
  if(settingsTab==='emotes')renderEmoteSettings();
@@ -552,18 +574,68 @@ function renderControlSettings(){
  ['joystick','follow','tap'].map(function(m){return '<div class="optionCard card '+(c.mode===m?'selected':'')+'" onclick="setControlMode(\''+m+'\')"><b>'+({joystick:'Virtual Joystick',follow:'Follow Finger',tap:'Tap Direction'})[m]+'</b><div class="muted">'+({joystick:'Analog thumb control',follow:'Hold and guide',tap:'Tap where to turn'})[m]+'</div></div>'}).join('')+
  '<h3>Handedness</h3><div class="optionList"><div class="optionCard card '+(c.handed==='left'?'selected':'')+'" onclick="setHanded(\'left\')">Joystick Left</div><div class="optionCard card '+(c.handed==='right'?'selected':'')+'" onclick="setHanded(\'right\')">Joystick Right</div></div>'+
  '<div class="sliderRow"><b>Joystick size</b><input type="range" min="0.8" max="1.3" step="0.1" value="'+c.size+'" oninput="setControlValue(\'size\',this.value)"><span>'+c.size+'×</span></div>'+
- '<div class="sliderRow"><b>Sensitivity</b><input type="range" min="0.7" max="1.5" step="0.1" value="'+c.sensitivity+'" oninput="setControlValue(\'sensitivity\',this.value)"><span>'+c.sensitivity+'×</span></div></div>'+
+ '<div class="sliderRow"><b>Sensitivity</b><input type="range" min="0.7" max="1.5" step="0.1" value="'+c.sensitivity+'" oninput="setControlValue(\'sensitivity\',this.value)"><span>'+c.sensitivity+'×</span></div>'+
+ '<div class="sliderRow"><b>Move inward</b><input type="range" min="0" max="140" step="5" value="'+c.joyX+'" oninput="setControlValue(\'joyX\',this.value)"><span>'+c.joyX+' px</span></div>'+
+ '<div class="sliderRow"><b>Move upward</b><input type="range" min="0" max="150" step="5" value="'+c.joyY+'" oninput="setControlValue(\'joyY\',this.value)"><span>'+c.joyY+' px</span></div>'+
+ '<button class="secondary" onclick="resetJoystickPosition()">RESET JOYSTICK POSITION</button></div>'+
  '<div class="previewArena" id="controlPreview"><div class="miniSnake" id="controlMini"></div><div class="foodDot" style="left:66%;top:25%">🍎</div><div class="foodDot" style="left:35%;top:60%">🍇</div><div class="controlDemo"><div class="demoJoy">MOVE</div><div class="demoBoost">BOOST</div></div><button class="primary" style="position:absolute;left:50%;bottom:20px;transform:translateX(-50%)">USE CONTROLS</button></div></div>';
  makePreviewSnake($('controlMini'),currentSkin());applyControlPreview();
 }
 function setControlMode(m){data.controls.mode=m;saveData();renderControlSettings()}
 function setHanded(h){data.controls.handed=h;saveData();renderControlSettings()}
-function setControlValue(k,v){data.controls[k]=Number(v);saveData();applyControlPreview()}
+function setControlValue(k,v){
+ data.controls[k]=Number(v);saveData();applyControlPreview();applyControlLayout();
+}
+function resetJoystickPosition(){
+ data.controls.joyX=0;data.controls.joyY=0;saveData();renderControlSettings();applyControlLayout();
+}
 function applyControlPreview(){
  const p=$('controlPreview');if(!p)return;const joy=p.querySelector('.demoJoy'),boostEl=p.querySelector('.demoBoost');
- if(data.controls.handed==='right'){joy.style.left='auto';joy.style.right='22px';boostEl.style.right='auto';boostEl.style.left='22px'}else{joy.style.left='22px';joy.style.right='auto';boostEl.style.right='22px';boostEl.style.left='auto'}
+ const px=Math.round((data.controls.joyX||0)*.28),py=Math.round((data.controls.joyY||0)*.28);
+ if(data.controls.handed==='right'){joy.style.left='auto';joy.style.right=(22+px)+'px';boostEl.style.right='auto';boostEl.style.left='22px'}else{joy.style.left=(22+px)+'px';joy.style.right='auto';boostEl.style.right='22px';boostEl.style.left='auto'}
+ joy.style.bottom=(22+py)+'px';
  joy.style.transform='scale('+data.controls.size+')';
 }
+function autoFitScale(){
+ return clamp(Math.min(1,innerWidth/900,innerHeight/430),.75,1);
+}
+function applyDisplaySettings(){
+ const wanted=clamp(Number(data.display&&data.display.scale)||.92,.75,1);
+ const effective=Math.min(wanted,autoFitScale());
+ const sx=clamp(Number(data.display&&data.display.safeX)||0,0,30);
+ const sy=clamp(Number(data.display&&data.display.safeY)||0,0,24);
+ document.documentElement.style.setProperty('--menuScale',effective.toFixed(3));
+ document.documentElement.style.setProperty('--safeX',sx+'px');
+ document.documentElement.style.setProperty('--safeY',sy+'px');
+ if($('displayEffective'))$('displayEffective').textContent=Math.round(effective*100)+'%';
+}
+function setDisplayValue(k,v){
+ data.display[k]=Number(v);saveData();applyDisplaySettings();renderDisplaySettings();
+}
+function autoFitDisplay(){
+ data.display.scale=autoFitScale();
+ data.display.safeX=6;
+ data.display.safeY=4;
+ saveData();applyDisplaySettings();renderDisplaySettings();
+}
+function resetDisplay(){
+ data.display={scale:.92,safeX:6,safeY:4};
+ saveData();applyDisplaySettings();renderDisplaySettings();
+}
+function renderDisplaySettings(){
+ applyDisplaySettings();
+ const d=data.display,effective=Math.min(d.scale,autoFitScale());
+ $('settingsContent').innerHTML='<div class="settingsLayout"><div class="panel" style="padding:16px"><h2 class="yellow">Display Adjustment</h2>'+
+ '<p class="muted">If the starting UI goes outside your phone screen, reduce UI scale or increase safe margins. Auto-fit always prevents major overflow.</p>'+
+ '<div class="sliderRow"><b>UI scale</b><input type="range" min="0.75" max="1" step="0.05" value="'+d.scale+'" oninput="setDisplayValue(\'scale\',this.value)"><span>'+Math.round(d.scale*100)+'%</span></div>'+
+ '<div class="sliderRow"><b>Side safe margin</b><input type="range" min="0" max="30" step="2" value="'+d.safeX+'" oninput="setDisplayValue(\'safeX\',this.value)"><span>'+d.safeX+' px</span></div>'+
+ '<div class="sliderRow"><b>Top/bottom margin</b><input type="range" min="0" max="24" step="2" value="'+d.safeY+'" oninput="setDisplayValue(\'safeY\',this.value)"><span>'+d.safeY+' px</span></div>'+
+ '<div class="pill">Effective fit: <b id="displayEffective">'+Math.round(effective*100)+'%</b></div><div style="margin-top:14px"><button class="primary" style="font-size:16px;padding:10px 18px" onclick="autoFitDisplay()">AUTO FIT</button> <button class="secondary" onclick="resetDisplay()">RESET</button></div></div>'+
+ '<div class="displayPreview"><div id="displaySafePreview" class="displaySafe"><div class="displayMock"><div></div><div class="mockCenter"></div><div></div><div></div><div></div><div class="mockBottom"></div></div></div></div></div>';
+ const p=$('displaySafePreview');
+ if(p){const sx=8+d.safeX*.7,sy=8+d.safeY*.7;p.style.left=sx+'px';p.style.right=sx+'px';p.style.top=sy+'px';p.style.bottom=sy+'px';p.style.transform='scale('+effective+')';}
+}
+
 function renderArenaSettings(){
  $('settingsContent').innerHTML='<div class="settingsLayout"><div class="optionList">'+ARENAS.map(function(a){const own=data.ownedArenas.includes(a.id);return '<div class="optionCard card '+(data.selectedArena===a.id?'selected':'')+' '+(!own?'locked':'')+'" onclick="'+(own?"selectArena('"+a.id+"')":"buyArena('"+a.id+"')")+'" style="background:linear-gradient(135deg,'+a.a+','+a.b+')"><b>'+a.name+'</b><div class="muted">'+(own?(data.selectedArena===a.id?'Selected':'Tap to select'):'🪙 '+a.price)+'</div></div>'}).join('')+'</div><div id="arenaPreview" class="previewArena"></div></div>';paintArenaPreview();
 }
@@ -642,7 +714,7 @@ let run=null,runStart=0,lastMinuteReward=0,lastMissionSave=0;
 function resize(){
  DPR=Math.min(devicePixelRatio||1,1.75);W=innerWidth;H=innerHeight;
  canvas.width=Math.max(1,Math.round(W*DPR));canvas.height=Math.max(1,Math.round(H*DPR));canvas.style.width=W+'px';canvas.style.height=H+'px';
- ctx.setTransform(DPR,0,0,DPR,0,0);applyControlLayout();
+ ctx.setTransform(DPR,0,0,DPR,0,0);applyControlLayout();applyDisplaySettings();
 }
 addEventListener('resize',resize);resize();
 
@@ -1001,9 +1073,18 @@ requestAnimationFrame(frame);
 
 function applyControlLayout(){
  const joy=$('joystick'),boostEl=$('boostBtn'),emote=$('emoteBtn'),scale=data.controls.size||1;
+ if(!joy||!boostEl||!emote)return;
+ const inward=clamp(Number(data.controls.joyX)||0,0,Math.max(0,W*.30));
+ const upward=clamp(Number(data.controls.joyY)||0,0,Math.max(0,H*.34));
  joy.style.transform='scale('+scale+')';joy.style.transformOrigin=data.controls.handed==='right'?'bottom right':'bottom left';
- if(data.controls.handed==='right'){joy.style.left='auto';joy.style.right='18px';boostEl.style.right='auto';boostEl.style.left='20px';emote.style.right='auto';emote.style.left='118px'}
- else{joy.style.left='18px';joy.style.right='auto';boostEl.style.right='20px';boostEl.style.left='auto';emote.style.right='118px';emote.style.left='auto'}
+ joy.style.bottom=(18+upward)+'px';
+ if(data.controls.handed==='right'){
+  joy.style.left='auto';joy.style.right=(18+inward)+'px';
+  boostEl.style.right='auto';boostEl.style.left='20px';emote.style.right='auto';emote.style.left='118px';
+ }else{
+  joy.style.left=(18+inward)+'px';joy.style.right='auto';
+  boostEl.style.right='20px';boostEl.style.left='auto';emote.style.right='118px';emote.style.left='auto';
+ }
  joy.style.display=data.controls.mode==='joystick'?'block':'none';
 }
 function steerFromPointer(e){pointer.x=e.clientX;pointer.y=e.clientY;pointer.lastMove=performance.now()}
@@ -1031,9 +1112,9 @@ function releaseBoost(e){if(boostPointerId!==null&&e&&e.pointerId!==boostPointer
 $('boostBtn').addEventListener('pointerup',releaseBoost);$('boostBtn').addEventListener('pointercancel',releaseBoost);$('boostBtn').addEventListener('lostpointercapture',releaseBoost);
 $('emoteBtn').addEventListener('pointerdown',function(e){$('emoteBubble').textContent=currentEmote().emoji;emoteUntil=performance.now()+2000;e.preventDefault();e.stopPropagation()});
 
-refreshWallet();resetDailyMissionsIfNeeded();renderLobby();
+applyDisplaySettings();refreshWallet();resetDailyMissionsIfNeeded();renderLobby();
 window.showScreen=showScreen;window.setDifficulty=setDifficulty;window.setWardrobeTab=setWardrobeTab;window.setSettingsTab=setSettingsTab;window.buySkin=buySkin;window.selectSkin=selectSkin;window.buyUpgrade=buyUpgrade;
-window.setControlMode=setControlMode;window.setHanded=setHanded;window.setControlValue=setControlValue;window.buyArena=buyArena;window.selectArena=selectArena;window.buyFood=buyFood;window.selectFood=selectFood;window.buyEmote=buyEmote;window.selectEmote=selectEmote;window.toggleSound=toggleSound;
+window.setControlMode=setControlMode;window.setHanded=setHanded;window.setControlValue=setControlValue;window.resetJoystickPosition=resetJoystickPosition;window.setDisplayValue=setDisplayValue;window.autoFitDisplay=autoFitDisplay;window.resetDisplay=resetDisplay;window.buyArena=buyArena;window.selectArena=selectArena;window.buyFood=buyFood;window.selectFood=selectFood;window.buyEmote=buyEmote;window.selectEmote=selectEmote;window.toggleSound=toggleSound;
 window.openDaily=openDaily;window.claimDaily=claimDaily;window.openMissions=openMissions;window.claimMission=claimMission;window.closeModal=closeModal;window.startMatch=startMatch;window.resumeGame=resumeGame;window.quitToLobby=quitToLobby;
 window.handleAndroidBack=function(){
  if($('dailyModal').classList.contains('show')){closeModal('dailyModal');return true}
