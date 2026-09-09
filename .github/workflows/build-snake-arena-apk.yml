@@ -978,5 +978,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Snake-Arena-IO-Thumbnail-APK
-          path: Snake-Arena-IO-v2.apk
+          path: Snake-Arena-IO-thumbnail.apk
           if-no-files-found: error
