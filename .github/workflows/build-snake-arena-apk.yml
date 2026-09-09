@@ -1169,5 +1169,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Snake-Arena-IO-Live-Map-APK
-          path: Snake-Arena-IO-joystick.apk
+          path: Snake-Arena-IO-live-map.apk
           if-no-files-found: error
