@@ -1,4 +1,4 @@
-name: Build Snake Arena Live Map APK
+name: Build Snake Arena Better APK
 
 on:
   push:
@@ -81,8 +81,8 @@ jobs:
                   applicationId 'com.snakearena.game'
                   minSdk 24
                   targetSdk 35
-                  versionCode 5
-                  versionName '2.3.0'
+                  versionCode 6
+                  versionName '2.4.0'
               }
 
               buildTypes {
@@ -364,13 +364,13 @@ jobs:
               <div class="title">LEADERBOARD</div>
               <ol id="list"></ol>
             </div>
-            <div id="radarWrap" class="glass"><canvas id="radar" width="82" height="82"></canvas></div>
+            <div id="radarWrap" class="glass"><canvas id="radar" width="120" height="120"></canvas></div>
             <div id="joystick"><div id="stick"></div></div>
             <div id="energy"><div id="bar"></div></div>
             <div id="boostBtn">BOOST</div>
             <div id="start">
               <div class="card">
-                <div class="eyebrow">Endless Single Player v2</div>
+                <div class="eyebrow">Endless Single Player v2.4</div>
                 <h1>Snake Arena IO</h1>
                 <p>Start small. Eat fruits to grow. Survive 50 respawning AI snakes. If your head hits another snake's body or tail, you die.</p>
                 <p>Use the left joystick to steer and hold BOOST with your right thumb. The LIVE MAP follows your snake, keeps you in the center, and shows nearby AI snakes moving around you.</p>
@@ -467,12 +467,13 @@ jobs:
           let foodGrid=new Map();
           let bodyGrid=new Map();
           const snakes=[];
-          const pointer={x:W*.7,y:H*.5};
+          const pointer={x:W*.7,y:H*.5,lastMove:0};
           const joystick={
             active:false,
             pointerId:null,
             x:0,
             y:0,
+            lastAngle:0,
             max:39
           };
 
@@ -545,6 +546,7 @@ jobs:
               this.name=name;this.color=color;this.isPlayer=isPlayer;
               this.radius=10.5;this.spacing=6;
               this.turnRate=isPlayer?4.9:rand(2.5,3.5);
+              this.cruise=rand(.97,1.03);
               this.ai={timer:0,target:null,bravery:Math.random()};
               this.score=0;this.respawn(true);
             }
@@ -627,9 +629,21 @@ jobs:
             }
 
             updatePlayer(dt){
-              const target=joystick.active&&Math.hypot(joystick.x,joystick.y)>.12
-                ? Math.atan2(joystick.y,joystick.x)
-                : Math.atan2(pointer.y-H/2,pointer.x-W/2);
+              let target=this.angle;
+              const joyAmount=Math.hypot(joystick.x,joystick.y);
+
+              if(joystick.active&&joyAmount>.12){
+                joystick.lastAngle=Math.atan2(joystick.y,joystick.x);
+                target=joystick.lastAngle;
+              }else if(performance.now()-pointer.lastMove<1200){
+                // Desktop mouse fallback only after a real recent mouse movement.
+                target=Math.atan2(pointer.y-H/2,pointer.x-W/2);
+                joystick.lastAngle=target;
+              }else if(Number.isFinite(joystick.lastAngle)){
+                // On phone, releasing the stick keeps the snake going in the chosen direction.
+                target=joystick.lastAngle;
+              }
+
               this.angle+=angleDiff(this.angle,target)*Math.min(1,this.turnRate*dt);
               if(boost&&this.energy>.02&&this.length>MIN_LENGTH){
                 this.speed=BOOST_SPEED;
@@ -695,7 +709,7 @@ jobs:
                 this.speed=BOOST_SPEED*.84;
                 this.energy=Math.max(0,this.energy-dt*.13);
               }else{
-                this.speed=BASE_SPEED*rand(.96,1.03);
+                this.speed=BASE_SPEED*this.cruise;
                 this.energy=Math.min(1,this.energy+dt*.09);
               }
             }
@@ -911,7 +925,7 @@ jobs:
             rctx.fillStyle='rgba(255,215,92,.30)';
             for(const bucket of foodBuckets){
               for(const f of bucket){
-                if(!f.alive||foodDrawn>90)continue;
+                if(!f.alive||foodDrawn>=80)continue;
                 const dx=delta(player.x,f.x);
                 const dy=delta(player.y,f.y);
                 if(Math.abs(dx)>radarRange||Math.abs(dy)>radarRange)continue;
@@ -993,9 +1007,9 @@ jobs:
             rctx.fill();
             rctx.restore();
 
-            rctx.strokeStyle='rgba(255,255,255,.18)';
-            rctx.lineWidth=1;
-            rctx.strokeRect(.5,.5,w-1,h-1);
+            rctx.strokeStyle='rgba(255,255,255,.24)';
+            rctx.lineWidth=1.5;
+            rctx.strokeRect(.75,.75,w-1.5,h-1.5);
           }
 
           function updateHud(){
@@ -1017,22 +1031,42 @@ jobs:
             boost=false;
             $('boostBtn').classList.remove('active');
             joystick.active=false;joystick.pointerId=null;joystick.x=0;joystick.y=0;
+            joystick.lastAngle=player.angle;
             $('joystick').classList.remove('active');
             $('stick').style.transform='translate(-50%,-50%)';
-            pointer.x=W*.7;pointer.y=H*.5;
+            pointer.x=W*.7;pointer.y=H*.5;pointer.lastMove=0;
           }
 
           function setPaused(value){
             if(!started)return;
             paused=value;
+            if(paused){
+              boost=false;
+              boostPointerId=null;
+              $('boostBtn').classList.remove('active');
+              if(joystick.active&&Math.hypot(joystick.x,joystick.y)>.12){
+                joystick.lastAngle=Math.atan2(joystick.y,joystick.x);
+              }
+              joystick.active=false;
+              joystick.pointerId=null;
+              joystick.x=0;joystick.y=0;
+              $('joystick').classList.remove('active');
+              $('stick').style.transform='translate(-50%,-50%)';
+            }
             $('pause').style.display=paused?'flex':'none';
           }
 
-          window.snakeAppPause=()=>{if(started&&player.alive){paused=true}};
-          window.snakeAppResume=()=>{last=performance.now()};
+          window.snakeAppPause=()=>{
+            if(started&&player.alive)setPaused(true);
+          };
+          window.snakeAppResume=()=>{
+            last=performance.now();
+            if(started&&player.alive&&paused)$('pause').style.display='flex';
+          };
 
           document.addEventListener('visibilitychange',()=>{
-            if(document.hidden&&started&&player.alive)paused=true;
+            if(document.hidden&&started&&player.alive)setPaused(true);
+            else if(!document.hidden&&started&&player.alive&&paused)$('pause').style.display='flex';
             last=performance.now();
           });
 
@@ -1067,6 +1101,7 @@ jobs:
           function steerFromEvent(e){
             pointer.x=e.clientX;
             pointer.y=e.clientY;
+            pointer.lastMove=performance.now();
           }
 
           canvas.addEventListener('mousemove',steerFromEvent);
@@ -1094,6 +1129,9 @@ jobs:
           function releaseJoystick(e){
             if(!joystick.active)return;
             if(e&&joystick.pointerId!==null&&e.pointerId!==joystick.pointerId)return;
+            if(Math.hypot(joystick.x,joystick.y)>.12){
+              joystick.lastAngle=Math.atan2(joystick.y,joystick.x);
+            }
             joystick.active=false;
             joystick.pointerId=null;
             joystick.x=0;joystick.y=0;
@@ -1141,6 +1179,8 @@ jobs:
           $('boostBtn').addEventListener('lostpointercapture',releaseBoost);
 
           $('play').onclick=()=>{
+            joystick.lastAngle=player.angle;
+            pointer.lastMove=0;
             started=true;
             paused=false;
             $('start').style.display='none';
@@ -1163,11 +1203,11 @@ jobs:
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-live-map.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-better-v2.4.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Snake-Arena-IO-Live-Map-APK
-          path: Snake-Arena-IO-live-map.apk
+          name: Snake-Arena-IO-Better-v2.4-APK
+          path: Snake-Arena-IO-better-v2.4.apk
           if-no-files-found: error
