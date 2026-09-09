@@ -1,4 +1,4 @@
-name: Build Snake Arena Restart Fix APK
+name: Build Snake Arena Growth Balance APK
 
 on:
   push:
@@ -81,8 +81,8 @@ jobs:
                   applicationId 'com.snakearena.game'
                   minSdk 24
                   targetSdk 35
-                  versionCode 11
-                  versionName '3.4.0'
+                  versionCode 12
+                  versionName '3.5.0'
               }
 
               buildTypes {
@@ -336,11 +336,11 @@ jobs:
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v3.4-restart-fix.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v3.5-growth-balance.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Snake-Arena-IO-v3.4-Restart-Fix-APK
-          path: Snake-Arena-IO-v3.4-restart-fix.apk
+          name: Snake-Arena-IO-v3.5-Growth-Balance-APK
+          path: Snake-Arena-IO-v3.5-growth-balance.apk
           if-no-files-found: error
