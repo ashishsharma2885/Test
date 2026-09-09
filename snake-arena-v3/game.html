@@ -63,6 +63,12 @@ linear-gradient(#08111b,#071018)}
 .previewHead:before,.previewHead:after{content:"";position:absolute;width:9px;height:9px;border-radius:50%;background:white;top:9px}
 .previewHead:before{left:8px}.previewHead:after{right:8px}
 .previewHead i{position:absolute;left:19px;bottom:-4px;width:8px;height:8px;border-radius:50%;background:#ff6072}
+.difficultySelect{display:flex;gap:8px;margin:8px 0 10px;padding:6px;background:rgba(0,0,0,.28);border-radius:16px;border:1px solid rgba(255,255,255,.1)}
+.diffBtn{min-width:92px;padding:9px 13px;border-radius:11px;border:2px solid rgba(255,255,255,.18);color:#eaf6ff;font-weight:1000;background:linear-gradient(#3d75ad,#28527e);box-shadow:0 3px 0 rgba(0,0,0,.28)}
+.diffBtn.active.easy{background:linear-gradient(#67ea8c,#24ae52);border-color:#a7ffbd;color:#08391a}
+.diffBtn.active.medium{background:linear-gradient(#ffd85b,#e7a91b);border-color:#fff2a2;color:#533700}
+.diffBtn.active.hard{background:linear-gradient(#ff7878,#cf343f);border-color:#ffb0b0;color:#4b070d}
+.diffHint{font-size:11px;color:#b9d2e6;font-weight:800;min-height:14px}
 .playBtn{font-size:34px;padding:13px 48px;border-radius:22px}
 .bottomNav{grid-column:1/4;grid-row:3;display:flex;justify-content:center;align-items:end;gap:13px}
 .navBtn{width:122px;height:62px;border-radius:16px;background:linear-gradient(#4aa9f2,#2365aa);border:3px solid #85caff;box-shadow:0 5px 0 #133d68;font-size:14px}
@@ -152,8 +158,14 @@ input[type=range]{width:100%}
     <div class="centerLobby">
       <div class="logoText">SNAKE <span>ARENA IO</span></div>
       <div class="snakePreview" id="lobbySnakePreview"></div>
+      <div class="difficultySelect">
+        <button id="diff-easy" class="diffBtn easy" onclick="setDifficulty('easy')">EASY</button>
+        <button id="diff-medium" class="diffBtn medium" onclick="setDifficulty('medium')">MEDIUM</button>
+        <button id="diff-hard" class="diffBtn hard" onclick="setDifficulty('hard')">HARD</button>
+      </div>
+      <div id="difficultyHint" class="diffHint"></div>
       <button class="primary playBtn" onclick="startMatch()">PLAY</button>
-      <div class="muted" style="margin-top:10px;font-weight:800">Endless arena · 50 AI rivals · offline</div>
+      <div class="muted" style="margin-top:10px;font-weight:800">Endless arena · 50 AI rivals · bots fight each other · offline</div>
     </div>
 
     <div class="quickRight">
@@ -218,7 +230,7 @@ input[type=range]{width:100%}
 <section id="gameScreen" class="screen">
   <canvas id="game"></canvas>
   <div id="gameUI">
-    <div id="stats" class="hudBox">Score <b id="score">0</b><br>Length <b id="length">12</b><br>Rank <b id="rank">-</b><br>Coins <b id="runCoins">0</b></div>
+    <div id="stats" class="hudBox">Score <b id="score">0</b><br>Length <b id="length">12</b><br>Rank <b id="rank">-</b><br>Coins <b id="runCoins">0</b><br>Mode <b id="gameDifficulty">MEDIUM</b></div>
     <div id="leader" class="hudBox"><b>LEADERBOARD</b><ol id="leaderList"></ol></div>
     <div id="radarWrap" class="hudBox"><canvas id="radar" width="120" height="120"></canvas></div>
     <div id="joystick"><div id="stick"></div></div>
@@ -328,9 +340,45 @@ const UPGRADE_META={
 };
 const UPGRADE_COST=[0,150,300,500,800,1200,1700,2300,3000,4000];
 
+const DIFFICULTY={
+ easy:{
+  label:'EASY',
+  hint:'Slower, more reckless bots. Easier to cut them off and make them crash.',
+  speed:.86,turn:.78,decisionMin:.34,decisionMax:.62,avoidRange:82,
+  aggression:.38,boostChance:.18,boostEnergy:.42,combatRange:760,
+  combatLead:130,combatOffset:115,playerThreat:.08,easyCrashBonus:5
+ },
+ medium:{
+  label:'MEDIUM',
+  hint:'Balanced bot speed, reactions, fighting and body avoidance.',
+  speed:1,turn:1,decisionMin:.22,decisionMax:.44,avoidRange:112,
+  aggression:.55,boostChance:.46,boostEnergy:.30,combatRange:900,
+  combatLead:160,combatOffset:100,playerThreat:.28,easyCrashBonus:0
+ },
+ hard:{
+  label:'HARD',
+  hint:'Faster smart bots: stronger avoidance, boosting, ambushes and interceptions.',
+  speed:1.12,turn:1.2,decisionMin:.12,decisionMax:.28,avoidRange:150,
+  aggression:.78,boostChance:.78,boostEnergy:.20,combatRange:1120,
+  combatLead:210,combatOffset:80,playerThreat:.62,easyCrashBonus:0
+ }
+};
+function difficultyConfig(){return DIFFICULTY[data.difficulty]||DIFFICULTY.medium}
+function setDifficulty(mode){
+ if(!DIFFICULTY[mode])return;
+ data.difficulty=mode;saveData();renderDifficultySelector();
+}
+function renderDifficultySelector(){
+ const cfg=difficultyConfig();
+ ['easy','medium','hard'].forEach(function(m){
+  const el=$('diff-'+m);if(el)el.classList.toggle('active',data.difficulty===m);
+ });
+ if($('difficultyHint'))$('difficultyHint').textContent=cfg.hint;
+}
+
 function defaultData(){
  return {
-  name:'Player',coins:500,level:1,xp:0,
+  name:'Player',coins:500,level:1,xp:0,difficulty:'medium',
   stats:{bestScore:0,maxLength:0,bestSurvival:0,gamesPlayed:0,gamesWon:0,botsDefeated:0,totalFruits:0,totalCoins:0,totalPlayTime:0},
   ownedSkins:['classic'],selectedSkin:'classic',
   ownedArenas:['dark'],selectedArena:'dark',
@@ -406,6 +454,7 @@ function renderLobby(){
  refreshWallet();$('lobbyName').textContent=data.name;$('lobbyLevel').textContent=data.level;
  $('lobbyXPBar').style.width=(data.xp/xpNeeded(data.level)*100)+'%';
  makePreviewSnake($('lobbySnakePreview'),currentSkin());
+ renderDifficultySelector();
  resetDailyMissionsIfNeeded();
  $('dailyBadge').style.display=canClaimDaily()?'inline-flex':'none';
  $('missionBadge').style.display=hasClaimableMission()?'inline-flex':'none';
@@ -602,10 +651,14 @@ function safeSpawn(){for(let n=0;n<60;n++){const p={x:rand(0,WORLD),y:rand(0,WOR
 
 class Snake{
  constructor(name,color,isPlayer){
-  this.name=name;this.color=color;this.isPlayer=!!isPlayer;this.radius=10.5;this.spacing=6;this.turnRate=this.isPlayer?4.9:rand(2.5,3.5);this.cruise=rand(.97,1.03);this.ai={timer:0,target:null,bravery:Math.random()};this.score=0;this.respawn(true);
+  this.name=name;this.color=color;this.isPlayer=!!isPlayer;this.radius=10.5;this.spacing=6;this.turnRate=this.isPlayer?4.9:rand(2.5,3.5);this.cruise=rand(.97,1.03);this.ai={
+   timer:0,target:null,bravery:Math.random(),targetAge:0,
+   roamAngle:rand(-Math.PI,Math.PI),stuckTime:0,moveCheck:0,
+   lastX:0,lastY:0,fightSide:Math.random()<.5?-1:1
+  };this.score=0;this.respawn(true);
  }
  respawn(first){
-  const p=safeSpawn();this.x=p.x;this.y=p.y;this.angle=rand(-Math.PI,Math.PI);this.alive=true;this.length=this.isPlayer?12:rand(16,30);this.energy=1;this.speed=BASE_SPEED;this.history=[];this.segments=[];this.ai.target=null;this.ai.timer=0;
+  const p=safeSpawn();this.x=p.x;this.y=p.y;this.angle=rand(-Math.PI,Math.PI);this.alive=true;this.length=this.isPlayer?12:rand(16,30);this.energy=1;this.speed=BASE_SPEED;this.history=[];this.segments=[];this.ai.target=null;this.ai.timer=0;this.ai.targetAge=0;this.ai.stuckTime=0;this.ai.moveCheck=0;this.ai.lastX=this.x;this.ai.lastY=this.y;this.ai.roamAngle=this.angle+rand(-1.2,1.2);
   for(let i=0;i<150;i++)this.history.push({x:this.x,y:this.y});this.syncSegments();if(!first&&!this.isPlayer)this.score=0;
  }
  syncSegments(){
@@ -653,20 +706,118 @@ class Snake{
   $('bar').style.width=(this.energy*100).toFixed(1)+'%';
  }
  updateBot(dt){
+  const cfg=difficultyConfig();
   this.ai.timer-=dt;
-  if(this.ai.timer<=0||!this.ai.target){
-   this.ai.timer=rand(.18,.42);let target=null,best=-1e9;
-   const fb=neighborBuckets(foodGrid,this.x,this.y,FOOD_CELL,FOOD_CELLS,3);
-   for(const b of fb){for(const f of b){if(!f.alive)continue;const d=distance(this.x,this.y,f.x,f.y);if(d>950)continue;const desirability=(f.loot?560:120)+(f.golden?300:0)+f.v*65-d;if(desirability>best){best=desirability;target={x:f.x,y:f.y,type:'food'}}}}
-   let danger=null,dd=9999;const bb=neighborBuckets(bodyGrid,this.x,this.y,BODY_CELL,BODY_CELLS,1);
-   for(const b of bb){for(const item of b){if(item.owner===this||!item.owner.alive)continue;const d=distance(this.x,this.y,item.x,item.y);if(d<dd){dd=d;danger=item}}}
-   if(danger&&dd<120){const dx=-delta(this.x,danger.x),dy=-delta(this.y,danger.y);target={x:wrap(this.x+dx*5),y:wrap(this.y+dy*5),type:'avoid'}}
-   if(!target)target={x:wrap(this.x+Math.cos(this.angle+rand(-1,1))*600),y:wrap(this.y+Math.sin(this.angle+rand(-1,1))*600),type:'wander'};
+  this.ai.targetAge+=dt;
+  this.ai.moveCheck+=dt;
+
+  // Detect bots that are barely travelling and force a long new roaming route.
+  if(this.ai.moveCheck>=.9){
+   const travelled=distance(this.ai.lastX,this.ai.lastY,this.x,this.y);
+   if(travelled<72)this.ai.stuckTime+=this.ai.moveCheck;
+   else this.ai.stuckTime=Math.max(0,this.ai.stuckTime-.7);
+   this.ai.lastX=this.x;this.ai.lastY=this.y;this.ai.moveCheck=0;
+   if(this.ai.stuckTime>1.35){
+    this.ai.roamAngle=this.angle+rand(.75,2.25)*(Math.random()<.5?-1:1);
+    this.ai.target={
+     x:wrap(this.x+Math.cos(this.ai.roamAngle)*rand(900,1450)),
+     y:wrap(this.y+Math.sin(this.ai.roamAngle)*rand(900,1450)),
+     type:'wander'
+    };
+    this.ai.targetAge=0;this.ai.timer=rand(.5,.85);this.ai.stuckTime=0;
+   }
+  }
+
+  let targetReached=this.ai.target&&distance(this.x,this.y,this.ai.target.x,this.ai.target.y)<105;
+  let invalidFood=this.ai.target&&this.ai.target.type==='food'&&this.ai.target.food&&!this.ai.target.food.alive;
+  const needsDecision=this.ai.timer<=0||!this.ai.target||targetReached||invalidFood||this.ai.targetAge>4.5;
+
+  if(needsDecision){
+   this.ai.timer=rand(cfg.decisionMin,cfg.decisionMax);
+   this.ai.targetAge=0;
+   let target=null,best=-1e9;
+
+   // 1) Avoid dangerous body sections. Hard mode notices danger earlier.
+   let danger=null,dd=9999;
+   const bb=neighborBuckets(bodyGrid,this.x,this.y,BODY_CELL,BODY_CELLS,1);
+   for(const b of bb){for(const item of b){
+    if(item.owner===this||!item.owner.alive)continue;
+    const d=distance(this.x,this.y,item.x,item.y);
+    if(d<dd){dd=d;danger=item}
+   }}
+   if(danger&&dd<cfg.avoidRange){
+    const dx=-delta(this.x,danger.x),dy=-delta(this.y,danger.y);
+    const escapeAngle=Math.atan2(dy,dx)+rand(-.35,.35);
+    target={
+     x:wrap(this.x+Math.cos(escapeAngle)*rand(420,720)),
+     y:wrap(this.y+Math.sin(escapeAngle)*rand(420,720)),
+     type:'avoid'
+    };
+   }
+
+   // 2) Bot-vs-bot fighting: intercept ahead of another snake instead of blindly ramming its body.
+   if(!target&&Math.random()<cfg.aggression){
+    let opponent=null,opponentScore=-1e9;
+    for(const other of snakes){
+     if(other===this||!other.alive)continue;
+     // Easy mode mostly makes bots fight each other; hard mode increasingly hunts the player too.
+     if(other.isPlayer&&Math.random()>cfg.playerThreat)continue;
+     const d=distance(this.x,this.y,other.x,other.y);
+     if(d>cfg.combatRange||d<135)continue;
+     let score=(cfg.combatRange-d)+(other.isPlayer?80:145)+rand(-90,90);
+     if(score>opponentScore){opponentScore=score;opponent=other}
+    }
+    if(opponent){
+     const lead=cfg.combatLead+Math.min(150,opponent.speed*.35);
+     const side=cfg.combatOffset*this.ai.fightSide;
+     const ox=Math.cos(opponent.angle)*lead+Math.cos(opponent.angle+Math.PI/2)*side;
+     const oy=Math.sin(opponent.angle)*lead+Math.sin(opponent.angle+Math.PI/2)*side;
+     target={x:wrap(opponent.x+ox),y:wrap(opponent.y+oy),type:'combat',enemy:opponent};
+     if(Math.random()<.18)this.ai.fightSide*=-1;
+    }
+   }
+
+   // 3) Collect useful food/loot.
+   if(!target){
+    const fb=neighborBuckets(foodGrid,this.x,this.y,FOOD_CELL,FOOD_CELLS,3);
+    for(const b of fb){for(const f of b){
+     if(!f.alive)continue;
+     const d=distance(this.x,this.y,f.x,f.y);
+     if(d>980)continue;
+     const desirability=(f.loot?520:105)+(f.golden?260:0)+f.v*58-d;
+     if(desirability>best){best=desirability;target={x:f.x,y:f.y,type:'food',food:f}}
+    }}
+   }
+
+   // 4) Long random roaming prevents bots from circling one tiny area.
+   if(!target){
+    const turn=rand(-1.05,1.05);
+    this.ai.roamAngle=this.angle+turn;
+    const roamDist=rand(820,1450);
+    target={
+     x:wrap(this.x+Math.cos(this.ai.roamAngle)*roamDist),
+     y:wrap(this.y+Math.sin(this.ai.roamAngle)*roamDist),
+     type:'wander'
+    };
+   }
    this.ai.target=target;
   }
-  const p=this.ai.target,ta=Math.atan2(delta(this.y,p.y),delta(this.x,p.x));this.angle+=angleDiff(this.angle,ta)*Math.min(1,this.turnRate*dt);
-  const use=p.type==='food'&&this.ai.bravery>.55&&this.energy>.28&&distance(this.x,this.y,p.x,p.y)>160;
-  if(use){this.speed=BOOST_SPEED*.84;this.energy=Math.max(0,this.energy-dt*.13)}else{this.speed=BASE_SPEED*this.cruise;this.energy=Math.min(1,this.energy+dt*.09)}
+
+  const p=this.ai.target;
+  const ta=Math.atan2(delta(this.y,p.y),delta(this.x,p.x));
+  this.angle+=angleDiff(this.angle,ta)*Math.min(1,this.turnRate*cfg.turn*dt);
+
+  const dToTarget=distance(this.x,this.y,p.x,p.y);
+  const wantsBoost=(p.type==='combat'||p.type==='food')&&
+    Math.random()<cfg.boostChance&&this.energy>cfg.boostEnergy&&dToTarget>190;
+
+  if(wantsBoost){
+   this.speed=BOOST_SPEED*.82*cfg.speed;
+   this.energy=Math.max(0,this.energy-dt*.12);
+  }else{
+   this.speed=BASE_SPEED*this.cruise*cfg.speed;
+   this.energy=Math.min(1,this.energy+dt*.095);
+  }
  }
  eatNearby(){
   const magnet=6+(data.upgrades.magnet-1)*5;
@@ -704,9 +855,18 @@ function coinFeedback(amount){
 function collisionCheck(){
  for(const attacker of snakes){
   if(!attacker.alive)continue;const buckets=neighborBuckets(bodyGrid,attacker.x,attacker.y,BODY_CELL,BODY_CELLS,1);
-  outer:for(const b of buckets){for(const item of b){if(!attacker.alive)break outer;if(item.owner===attacker||!item.owner.alive)continue;if(distance(attacker.x,attacker.y,item.x,item.y)<attacker.radius+item.r-1.3){attacker.die(item.owner);break outer}}}
+  outer:for(const b of buckets){for(const item of b){if(!attacker.alive)break outer;if(item.owner===attacker||!item.owner.alive)continue;const easyBonus=(!attacker.isPlayer&&item.owner&&item.owner.isPlayer)?difficultyConfig().easyCrashBonus:0;
+   if(distance(attacker.x,attacker.y,item.x,item.y)<attacker.radius+item.r-1.3+easyBonus){attacker.die(item.owner);break outer}}}
  }
- for(let i=0;i<snakes.length;i++){const a=snakes[i];if(!a.alive)continue;for(let j=i+1;j<snakes.length;j++){const b=snakes[j];if(!b.alive)continue;if(distance(a.x,a.y,b.x,b.y)<a.radius+b.radius-3){a.die(null);b.die(null)}}}
+ for(let i=0;i<snakes.length;i++){const a=snakes[i];if(!a.alive)continue;for(let j=i+1;j<snakes.length;j++){const b=snakes[j];if(!b.alive)continue;if(distance(a.x,a.y,b.x,b.y)<a.radius+b.radius-3){
+   // Easy mode rewards good player positioning: if the player is clearly longer,
+   // the smaller bot loses a direct head clash. Otherwise both still crash.
+   if(data.difficulty==='easy'&&(a.isPlayer||b.isPlayer)){
+    const human=a.isPlayer?a:b,bot=a.isPlayer?b:a;
+    if(human.length>bot.length*1.18){bot.die(human)}
+    else{a.die(null);b.die(null)}
+   }else{a.die(null);b.die(null)}
+  }}}
 }
 function updateFood(dt){
  for(const f of foods){if(!f.alive)continue;if(f.loot){f.ttl-=dt;if(f.ttl<=0)f.alive=false}}
@@ -743,7 +903,7 @@ function drawRadar(){
 }
 function updateHUD(){
  const alive=snakes.filter(function(s){return s.alive}).sort(function(a,b){return(b.score+b.length*2)-(a.score+a.length*2)});
- $('score').textContent=Math.floor(player.score);$('length').textContent=Math.floor(player.length);$('rank').textContent=player.alive?(alive.indexOf(player)+1)+'/'+alive.length:'-';$('runCoins').textContent=run?run.coins:0;
+ $('score').textContent=Math.floor(player.score);$('length').textContent=Math.floor(player.length);$('rank').textContent=player.alive?(alive.indexOf(player)+1)+'/'+alive.length:'-';$('runCoins').textContent=run?run.coins:0;$('gameDifficulty').textContent=difficultyConfig().label;
  $('leaderList').innerHTML=alive.slice(0,6).map(function(s){return '<li style="'+(s===player?'color:#ffd45e;font-weight:900':'')+'">'+s.name+' — '+Math.floor(s.score+s.length*2)+'</li>'}).join('');
  if(emoteUntil>performance.now()){const p=screenPos(player.x,player.y,currentZoom());$('emoteBubble').style.display='block';$('emoteBubble').style.left=(p.x-16)+'px';$('emoteBubble').style.top=(p.y-55)+'px'}else $('emoteBubble').style.display='none';
 }
@@ -760,7 +920,7 @@ function finishMatch(){
  const levelInfo=applyXP(run.xp);data.stats.bestScore=Math.max(data.stats.bestScore,Math.floor(player.score));data.stats.maxLength=Math.max(data.stats.maxLength,run.maxLength);data.stats.bestSurvival=Math.max(data.stats.bestSurvival,survival);data.stats.totalPlayTime+=survival;
  data.missions.survival+=Math.floor(survival);data.missions.maxLength=Math.max(data.missions.maxLength,run.maxLength);saveData();
  $('postStats').innerHTML=[
-  ['SCORE',Math.floor(player.score)],['LENGTH',run.maxLength],['SURVIVAL',formatTime(survival)],['FRUITS',run.fruits],['BOTS',run.bots],['COINS','+'+run.coins],['XP','+'+run.xp],['RANK','#'+rank],['LEVEL',data.level]
+  ['SCORE',Math.floor(player.score)],['LENGTH',run.maxLength],['SURVIVAL',formatTime(survival)],['FRUITS',run.fruits],['BOTS',run.bots],['COINS','+'+run.coins],['XP','+'+run.xp],['RANK','#'+rank],['MODE',difficultyConfig().label]
  ].map(function(v){return '<div class="postStat card"><small>'+v[0]+'</small><strong>'+v[1]+'</strong></div>'}).join('');
  $('xpSummary').innerHTML='<b class="yellow">LEVEL '+run.startLevel+' → LEVEL '+data.level+'</b><div class="progress" style="margin-top:8px"><div style="width:'+(data.xp/xpNeeded(data.level)*100)+'%"></div></div><div class="muted" style="margin-top:5px">'+data.xp+' / '+xpNeeded(data.level)+' XP</div>';
  $('postModal').classList.add('show');run=null;renderLobby();
@@ -826,7 +986,7 @@ $('boostBtn').addEventListener('pointerup',releaseBoost);$('boostBtn').addEventL
 $('emoteBtn').addEventListener('pointerdown',function(e){$('emoteBubble').textContent=currentEmote().emoji;emoteUntil=performance.now()+2000;e.preventDefault();e.stopPropagation()});
 
 refreshWallet();resetDailyMissionsIfNeeded();renderLobby();
-window.showScreen=showScreen;window.setWardrobeTab=setWardrobeTab;window.setSettingsTab=setSettingsTab;window.buySkin=buySkin;window.selectSkin=selectSkin;window.buyUpgrade=buyUpgrade;
+window.showScreen=showScreen;window.setDifficulty=setDifficulty;window.setWardrobeTab=setWardrobeTab;window.setSettingsTab=setSettingsTab;window.buySkin=buySkin;window.selectSkin=selectSkin;window.buyUpgrade=buyUpgrade;
 window.setControlMode=setControlMode;window.setHanded=setHanded;window.setControlValue=setControlValue;window.buyArena=buyArena;window.selectArena=selectArena;window.buyFood=buyFood;window.selectFood=selectFood;window.buyEmote=buyEmote;window.selectEmote=selectEmote;window.toggleSound=toggleSound;
 window.openDaily=openDaily;window.claimDaily=claimDaily;window.openMissions=openMissions;window.claimMission=claimMission;window.closeModal=closeModal;window.startMatch=startMatch;window.resumeGame=resumeGame;window.quitToLobby=quitToLobby;
 })();
