@@ -189,7 +189,7 @@ input[type=range]{width:100%}
       </div>
       <div id="difficultyHint" class="diffHint"></div>
       <button class="primary playBtn" onclick="startMatch()">PLAY</button>
-      <div class="muted" style="margin-top:10px;font-weight:800">Start small · grow gradually by eating · 50 AI rivals · bots fight each other · offline</div>
+      <div class="muted" style="margin-top:10px;font-weight:800">Start at length 3 · grow gradually by eating · 50 AI rivals · bots fight each other · offline</div>
     </div>
 
     <div class="quickRight">
@@ -255,7 +255,7 @@ input[type=range]{width:100%}
 <section id="gameScreen" class="screen">
   <canvas id="game"></canvas>
   <div id="gameUI">
-    <div id="stats" class="hudBox">Score <b id="score">0</b><br>Length <b id="length">8</b><br>Rank <b id="rank">-</b><br>Coins <b id="runCoins">0</b><br>Mode <b id="gameDifficulty">MEDIUM</b></div>
+    <div id="stats" class="hudBox">Score <b id="score">0</b><br>Length <b id="length">3</b><br>Rank <b id="rank">-</b><br>Coins <b id="runCoins">0</b><br>Mode <b id="gameDifficulty">MEDIUM</b></div>
     <div id="leader" class="hudBox"><b>LEADERBOARD</b><ol id="leaderList"></ol></div>
     <div id="gameTopActions">
       <button class="gameActionBtn gameResetBtn" onclick="restartMatch()">↻ RESET</button>
@@ -736,7 +736,7 @@ function resize(){
 }
 addEventListener('resize',resize);resize();
 
-const WORLD=7600,FOOD_TARGET=1350,MAX_FOOD=2300,BOTS=50,BASE_SPEED=146,BOOST_SPEED=236,MIN_LENGTH=7,PLAYER_START_LENGTH=8;
+const WORLD=7600,FOOD_TARGET=1350,MAX_FOOD=2300,BOTS=50,BASE_SPEED=146,BOOST_SPEED=236,MIN_LENGTH=2.5,PLAYER_START_LENGTH=3;
 const FOOD_CELL=190,BODY_CELL=170,FOOD_CELLS=Math.ceil(WORLD/FOOD_CELL),BODY_CELLS=Math.ceil(WORLD/BODY_CELL);
 const BOT_COLORS=['#ff6b6b','#7bdff2','#8aff80','#ff9f43','#c56cf0','#54a0ff','#00d2d3','#feca57','#74b9ff','#fd79a8'];
 const BOT_NAMES=['Nova','Viper','Rex','Comet','Blaze','Echo','Bolt','Luna','Dash','Venom','Titan','Skye','Astro','Cobra','Ghost','Turbo','Spark','Neon','Hunter','Raptor','Flash','Cosmo','Matrix','Volt','Drift','Hydra','Orbit','Frost','Rocket','Pulse'];
@@ -798,8 +798,8 @@ class Snake{
  }
  updateBodySize(){
   if(this.isPlayer){
-   const extra=Math.sqrt(Math.max(0,this.length-PLAYER_START_LENGTH))*.42;
-   this.radius=clamp(7.6+extra,7.6,11.2);
+   const extra=Math.sqrt(Math.max(0,this.length-PLAYER_START_LENGTH))*.46;
+   this.radius=clamp(6.2+extra,6.2,11.2);
   }else{
    this.radius=clamp(9.2+Math.sqrt(Math.max(0,this.length-14))*.18,9.2,10.8);
   }
