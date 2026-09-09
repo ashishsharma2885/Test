@@ -78,6 +78,11 @@ linear-gradient(#08111b,#071018)}
 .badge{min-width:18px;height:18px;border-radius:10px;background:#ff4e55;border:2px solid #fff;color:#fff;font-size:10px;display:inline-flex;align-items:center;justify-content:center}
 .profileGrid{display:grid;grid-template-columns:340px 1fr;gap:18px}
 .identity{padding:18px;text-align:center}.bigAvatar{width:110px;height:110px;margin:0 auto 12px;border-radius:24px;background:linear-gradient(135deg,#45c8ff,#2f6ee3);display:flex;align-items:center;justify-content:center;font-size:64px;border:4px solid #a6e7ff}
+.nameEdit{display:flex;gap:8px;margin:12px auto;max-width:290px}.nameEdit input{min-width:0;flex:1;border-radius:11px;border:2px solid #78b9ff;background:#081c36;color:#fff;padding:10px 11px;font-weight:900;outline:none}.nameEdit input:focus{border-color:#79f0ff}
+.textureBox{margin:14px auto 0;padding:12px;max-width:300px;background:rgba(4,20,40,.38);border:1px solid rgba(255,255,255,.12);border-radius:14px}
+.texturePreview{width:92px;height:92px;border-radius:50%;margin:8px auto;background:radial-gradient(circle,#55e9ff,#246ca5);border:3px solid #9aeaff;background-size:cover;background-position:center;box-shadow:0 6px 16px rgba(0,0,0,.28)}
+.textureActions{display:flex;gap:7px;justify-content:center;flex-wrap:wrap}.textureActions button{font-size:12px;padding:8px 11px}
+.modeGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.modeCard{padding:14px;cursor:pointer;min-height:120px}.modeCard.selected{outline:4px solid #76ff8a}.modeCard h3{margin:0 0 6px;color:#fff35d}
 .statGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .statCard{padding:14px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between}.statCard .icon{font-size:30px}.statCard strong{font-size:23px}.statCard small{color:#d9eaff}
 .wardrobeLayout{display:grid;grid-template-columns:320px 1fr;gap:15px}
@@ -215,7 +220,22 @@ input[type=range]{width:100%}
       <div class="panel identity">
         <div class="bigAvatar">🐍</div>
         <h2 id="profileName">Player</h2>
+        <div class="nameEdit">
+          <input id="playerNameInput" maxlength="16" autocomplete="off" placeholder="Player name">
+          <button class="shopBtn" onclick="savePlayerName()">SAVE</button>
+        </div>
         <div class="pill">🌐 Local Player</div>
+        <div class="textureBox">
+          <b class="yellow">Custom Snake Texture</b>
+          <div id="texturePreview" class="texturePreview"></div>
+          <input id="textureFileInput" type="file" accept="image/*" style="display:none" onchange="handleTextureFile(this.files&&this.files[0])">
+          <div class="textureActions">
+            <button class="secondary" onclick="openTexturePicker()">GALLERY IMAGE</button>
+            <button id="toggleTextureBtn" class="secondary" onclick="toggleCustomTexture()">USE TEXTURE</button>
+            <button class="secondary" onclick="removeCustomTexture()">REMOVE</button>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:8px">Image is resized and compressed before saving for smoother gameplay.</div>
+        </div>
         <h3>Level <span id="profileLevel">1</span></h3>
         <div class="progress"><div id="profileXPBar"></div></div>
         <div class="muted" style="margin-top:8px"><span id="profileXP">0</span> XP</div>
@@ -244,6 +264,7 @@ input[type=range]{width:100%}
   <div class="tabs">
     <button id="settingsTab-controls" class="tabBtn active" onclick="setSettingsTab('controls')">🎮 Controls</button>
     <button id="settingsTab-display" class="tabBtn" onclick="setSettingsTab('display')">📱 Display</button>
+    <button id="settingsTab-performance" class="tabBtn" onclick="setSettingsTab('performance')">🚀 Performance</button>
     <button id="settingsTab-arena" class="tabBtn" onclick="setSettingsTab('arena')">🖼️ Arena</button>
     <button id="settingsTab-food" class="tabBtn" onclick="setSettingsTab('food')">🍎 Food</button>
     <button id="settingsTab-emotes" class="tabBtn" onclick="setSettingsTab('emotes')">😀 Emotes</button>
@@ -416,6 +437,8 @@ function defaultData(){
   upgrades:{speed:1,magnet:1,coin:1,food:1,mobility:1,boostDuration:1,boostRecovery:1,radar:1},
   controls:{mode:'joystick',handed:'left',size:1,sensitivity:1,joyX:0,joyY:0},
   display:{scale:.92,safeX:6,safeY:4},
+  performance:{mode:'auto'},
+  customTexture:'',useCustomTexture:false,
   sound:true,
   daily:{lastClaim:'',streak:0},
   missions:{date:'',fruits:0,bots:0,survival:0,coins:0,maxLength:0,claimed:{}}
@@ -432,6 +455,7 @@ function loadData(){
    d.upgrades=Object.assign(defaultData().upgrades,raw.upgrades||{});
    d.controls=Object.assign(defaultData().controls,raw.controls||{});
    d.display=Object.assign(defaultData().display,raw.display||{});
+   d.performance=Object.assign(defaultData().performance,raw.performance||{});
    d.daily=Object.assign(defaultData().daily,raw.daily||{});
    d.missions=Object.assign(defaultData().missions,raw.missions||{});
   }
@@ -477,6 +501,72 @@ function currentArena(){return ARENAS.find(function(s){return s.id===data.select
 function currentFoodTheme(){return FOOD_THEMES.find(function(s){return s.id===data.selectedFood})||FOOD_THEMES[0]}
 function currentEmote(){return EMOTES.find(function(s){return s.id===data.selectedEmote})||EMOTES[0]}
 
+let customTextureImage=null;
+let customTextureSprite=null;
+let customTextureReady=false;
+
+function rebuildTextureSprite(){
+ customTextureReady=false;customTextureSprite=null;
+ if(!data.customTexture)return;
+ const img=new Image();
+ img.onload=function(){
+  const size=64,cv=document.createElement('canvas');cv.width=size;cv.height=size;
+  const x=cv.getContext('2d');
+  x.save();x.beginPath();x.arc(size/2,size/2,size/2-1,0,Math.PI*2);x.clip();
+  const scale=Math.max(size/img.width,size/img.height);
+  const dw=img.width*scale,dh=img.height*scale;
+  x.drawImage(img,(size-dw)/2,(size-dh)/2,dw,dh);
+  const shade=x.createRadialGradient(22,18,2,32,32,38);
+  shade.addColorStop(0,'rgba(255,255,255,.22)');shade.addColorStop(1,'rgba(0,0,0,.10)');
+  x.fillStyle=shade;x.fillRect(0,0,size,size);x.restore();
+  customTextureImage=img;customTextureSprite=cv;customTextureReady=true;
+  renderLobby();
+  if($('profile').classList.contains('active'))renderProfile();
+ };
+ img.onerror=function(){customTextureReady=false;customTextureSprite=null};
+ img.src=data.customTexture;
+}
+function openTexturePicker(){
+ const input=$('textureFileInput');if(input){input.value='';input.click()}
+}
+function handleTextureFile(file){
+ if(!file||!file.type||file.type.indexOf('image/')!==0){toast('Please choose an image.');return}
+ if(file.size>12*1024*1024){toast('Image is too large. Choose one under 12 MB.');return}
+ const reader=new FileReader();
+ reader.onload=function(){
+  const img=new Image();
+  img.onload=function(){
+   const size=96,cv=document.createElement('canvas');cv.width=size;cv.height=size;
+   const x=cv.getContext('2d');
+   const scale=Math.max(size/img.width,size/img.height),dw=img.width*scale,dh=img.height*scale;
+   x.drawImage(img,(size-dw)/2,(size-dh)/2,dw,dh);
+   data.customTexture=cv.toDataURL('image/jpeg',.76);
+   data.useCustomTexture=true;
+   saveData();rebuildTextureSprite();renderProfile();renderLobby();
+   toast('Custom snake texture saved.');
+  };
+  img.onerror=function(){toast('Could not read this image.')};
+  img.src=reader.result;
+ };
+ reader.onerror=function(){toast('Could not open this image.')};
+ reader.readAsDataURL(file);
+}
+function toggleCustomTexture(){
+ if(!data.customTexture){openTexturePicker();return}
+ data.useCustomTexture=!data.useCustomTexture;saveData();renderProfile();renderLobby();
+}
+function removeCustomTexture(){
+ data.customTexture='';data.useCustomTexture=false;customTextureReady=false;customTextureSprite=null;saveData();renderProfile();renderLobby();toast('Custom texture removed.');
+}
+function sanitizePlayerName(value){
+ return String(value||'').replace(/[^A-Za-z0-9 _.-]/g,'').replace(/\s+/g,' ').trim().slice(0,16);
+}
+function savePlayerName(){
+ const input=$('playerNameInput'),name=sanitizePlayerName(input?input.value:'');
+ if(name.length<2){toast('Name must be at least 2 characters.');return}
+ data.name=name;saveData();renderProfile();renderLobby();toast('Player name saved.');
+}
+
 function clearMatchOverlays(){
  ['postModal','dailyModal','missionModal'].forEach(function(id){
   const el=$(id);if(el)el.classList.remove('show');
@@ -495,16 +585,25 @@ function showScreen(id){
  if(id==='settings')renderSettings();
 }
 function refreshWallet(){document.querySelectorAll('.coinBalance').forEach(function(el){el.textContent=data.coins})}
-function makePreviewSnake(container,skin){
+function makePreviewSnake(container,skin,useTexture){
  container.innerHTML='';
+ const textured=!!useTexture&&data.useCustomTexture&&!!data.customTexture;
  const wrap=document.createElement('div');wrap.className='previewSnake';
- for(let i=0;i<8;i++){const s=document.createElement('div');s.className='previewSeg';s.style.background=skin.body;if(i%2)s.style.boxShadow='inset 0 0 0 5px '+skin.accent+'33';wrap.appendChild(s)}
- const h=document.createElement('div');h.className='previewHead';h.style.background=skin.head;h.style.boxShadow='inset 0 0 0 5px '+skin.accent+'33';h.innerHTML='<i></i>';wrap.appendChild(h);container.appendChild(wrap);
+ for(let i=0;i<8;i++){
+  const s=document.createElement('div');s.className='previewSeg';
+  if(textured){s.style.backgroundImage='url("'+data.customTexture+'")';s.style.backgroundSize='cover';s.style.backgroundPosition='center'}
+  else{s.style.background=skin.body;if(i%2)s.style.boxShadow='inset 0 0 0 5px '+skin.accent+'33'}
+  wrap.appendChild(s)
+ }
+ const h=document.createElement('div');h.className='previewHead';
+ if(textured){h.style.backgroundImage='url("'+data.customTexture+'")';h.style.backgroundSize='cover';h.style.backgroundPosition='center'}
+ else{h.style.background=skin.head;h.style.boxShadow='inset 0 0 0 5px '+skin.accent+'33'}
+ h.innerHTML='<i></i>';wrap.appendChild(h);container.appendChild(wrap);
 }
 function renderLobby(){
  refreshWallet();$('lobbyName').textContent=data.name;$('lobbyLevel').textContent=data.level;
  $('lobbyXPBar').style.width=(data.xp/xpNeeded(data.level)*100)+'%';
- makePreviewSnake($('lobbySnakePreview'),currentSkin());
+ makePreviewSnake($('lobbySnakePreview'),currentSkin(),true);
  renderDifficultySelector();
  resetDailyMissionsIfNeeded();
  $('dailyBadge').style.display=canClaimDaily()?'inline-flex':'none';
@@ -512,6 +611,13 @@ function renderLobby(){
 }
 function renderProfile(){
  refreshWallet();$('profileName').textContent=data.name;$('profileLevel').textContent=data.level;$('profileXP').textContent=data.xp+' / '+xpNeeded(data.level);
+ const nameInput=$('playerNameInput');if(nameInput)nameInput.value=data.name;
+ const texturePreview=$('texturePreview');
+ if(texturePreview){
+  if(data.customTexture){texturePreview.style.backgroundImage='url("'+data.customTexture+'")';texturePreview.style.backgroundSize='cover';texturePreview.style.backgroundPosition='center'}
+  else{texturePreview.style.backgroundImage='';texturePreview.style.background='radial-gradient(circle,#55e9ff,#246ca5)'}
+ }
+ const toggleBtn=$('toggleTextureBtn');if(toggleBtn)toggleBtn.textContent=data.customTexture?(data.useCustomTexture?'TEXTURE ON':'TEXTURE OFF'):'USE TEXTURE';
  $('profileXPBar').style.width=(data.xp/xpNeeded(data.level)*100)+'%';
  const s=data.stats;
  const stats=[
@@ -578,9 +684,10 @@ function buyUpgrade(id){
 let settingsTab='controls';
 function setSettingsTab(t){settingsTab=t;renderSettings()}
 function renderSettings(){
- refreshWallet();['controls','display','arena','food','emotes','sound'].forEach(function(t){$('settingsTab-'+t).classList.toggle('active',t===settingsTab)});
+ refreshWallet();['controls','display','performance','arena','food','emotes','sound'].forEach(function(t){$('settingsTab-'+t).classList.toggle('active',t===settingsTab)});
  if(settingsTab==='controls')renderControlSettings();
  if(settingsTab==='display')renderDisplaySettings();
+ if(settingsTab==='performance')renderPerformanceSettings();
  if(settingsTab==='arena')renderArenaSettings();
  if(settingsTab==='food')renderFoodSettings();
  if(settingsTab==='emotes')renderEmoteSettings();
@@ -652,6 +759,30 @@ function renderDisplaySettings(){
  '<div class="displayPreview"><div id="displaySafePreview" class="displaySafe"><div class="displayMock"><div></div><div class="mockCenter"></div><div></div><div></div><div></div><div class="mockBottom"></div></div></div></div></div>';
  const p=$('displaySafePreview');
  if(p){const sx=8+d.safeX*.7,sy=8+d.safeY*.7;p.style.left=sx+'px';p.style.right=sx+'px';p.style.top=sy+'px';p.style.bottom=sy+'px';p.style.transform='scale('+effective+')';}
+}
+
+function performanceConfig(){
+ const mode=(data.performance&&data.performance.mode)||'auto';
+ if(mode==='smooth')return{mode:'smooth',dpr:1.15,maxSegments:220,maxFood:280,radarEvery:3,shadows:false};
+ if(mode==='quality')return{mode:'quality',dpr:1.75,maxSegments:500,maxFood:700,radarEvery:1,shadows:true};
+ const low=(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4)||Math.min(innerWidth,innerHeight)<390;
+ return low
+  ?{mode:'auto',dpr:1.25,maxSegments:260,maxFood:340,radarEvery:2,shadows:false}
+  :{mode:'auto',dpr:1.5,maxSegments:340,maxFood:460,radarEvery:2,shadows:true};
+}
+function setPerformanceMode(mode){
+ if(!['smooth','auto','quality'].includes(mode))return;
+ data.performance.mode=mode;saveData();resize();renderPerformanceSettings();
+}
+function renderPerformanceSettings(){
+ const mode=data.performance.mode||'auto',cfg=performanceConfig();
+ $('settingsContent').innerHTML='<div class="panel" style="padding:18px"><h2 class="yellow">Performance</h2><p class="muted">Choose how the game balances smooth FPS and graphics quality. Custom gallery textures are optimized automatically.</p><div class="modeGrid">'+
+ [
+  ['smooth','SMOOTH','Best for weaker phones. Lower render resolution and fewer visual snake segments.'],
+  ['auto','AUTO','Recommended. Adjusts quality based on the device.'],
+  ['quality','QUALITY','Sharper graphics. Best for faster phones.']
+ ].map(function(v){return '<div class="modeCard card '+(mode===v[0]?'selected':'')+'" onclick="setPerformanceMode(\''+v[0]+'\')"><h3>'+v[1]+'</h3><div class="muted">'+v[2]+'</div></div>'}).join('')+
+ '</div><div class="pill" style="margin-top:14px">Render cap: '+cfg.dpr.toFixed(2)+'× · Snake detail: '+cfg.maxSegments+'</div></div>';
 }
 
 function renderArenaSettings(){
@@ -779,7 +910,7 @@ function beginTransitionLock(){
  return true;
 }
 function resize(){
- DPR=Math.min(devicePixelRatio||1,1.75);W=innerWidth;H=innerHeight;
+ const pc=performanceConfig();DPR=Math.min(devicePixelRatio||1,pc.dpr);W=innerWidth;H=innerHeight;
  canvas.width=Math.max(1,Math.round(W*DPR));canvas.height=Math.max(1,Math.round(H*DPR));canvas.style.width=W+'px';canvas.style.height=H+'px';
  ctx.setTransform(DPR,0,0,DPR,0,0);applyControlLayout();applyDisplaySettings();
 }
@@ -1033,7 +1164,7 @@ class Snake{
 
 function initWorld(){
  foods=[];snakes=[];for(let i=0;i<FOOD_TARGET;i++)spawnFood();
- const skin=currentSkin();const player=new Snake('YOU',skin.body,true);snakes.push(player);
+ const skin=currentSkin();const player=new Snake(data.name||'Player',skin.body,true);snakes.push(player);
  for(let i=0;i<BOTS;i++){const base=BOT_NAMES[i%BOT_NAMES.length],suffix=i>=BOT_NAMES.length?String(i-BOT_NAMES.length+2):'';snakes.push(new Snake(base+suffix,BOT_COLORS[i%BOT_COLORS.length],false))}
  rebuildFoodGrid();rebuildBodyGrid();return player;
 }
@@ -1085,16 +1216,39 @@ function drawBackground(zoom){
 }
 function drawFood(time,zoom){
  ctx.textAlign='center';ctx.textBaseline='middle';
- for(const f of foods){if(!f.alive)continue;const p=screenPos(f.x,f.y,zoom);if(p.x<-25||p.x>W+25||p.y<-25||p.y>H+25)continue;
+ const pc=performanceConfig();let drawnFood=0;
+ for(const f of foods){if(!f.alive)continue;if(drawnFood>=pc.maxFood)break;const p=screenPos(f.x,f.y,zoom);if(p.x<-25||p.x>W+25||p.y<-25||p.y>H+25)continue;
   if(data.selectedFood==='neon'||f.loot||f.golden){ctx.save();ctx.shadowColor=f.golden?'#ffd84a':f.loot?'#ffe45c':'#65f6ff';ctx.shadowBlur=14;ctx.fillStyle=f.golden?'#ffd84a':f.loot?'#ffdb55':'#62eaff';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(3,f.r*zoom),0,Math.PI*2);ctx.fill();ctx.restore()}
   else{ctx.font=Math.max(10,Math.round(f.r*3*zoom))+'px Arial';ctx.fillText(f.emoji,p.x,p.y)}
+  drawnFood++;
  }
 }
 function drawSnake(s,zoom){
- if(!s.alive)return;const skin=s.isPlayer?currentSkin():null,body=skin?skin.body:s.color,head=skin?skin.head:s.color,accent=skin?skin.accent:'#ffffff';
- const visualStep=Math.max(1,Math.ceil(s.segments.length/500));
- for(let i=s.segments.length-1;i>=0;i-=visualStep){const seg=s.segments[i],p=screenPos(seg.x,seg.y,zoom);if(p.x<-40||p.x>W+40||p.y<-40||p.y>H+40)continue;const r=Math.max(3.5,s.radius*(1-(i/Math.max(1,s.segments.length))*.25)*zoom);ctx.fillStyle=body;ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();if(s.isPlayer&&i%6===0){ctx.fillStyle=accent+'55';ctx.beginPath();ctx.arc(p.x-r*.2,p.y-r*.2,r*.3,0,Math.PI*2);ctx.fill()}}
- const h=screenPos(s.x,s.y,zoom),hr=Math.max(5,s.radius*zoom+1);ctx.save();ctx.shadowColor=head;ctx.shadowBlur=12;ctx.fillStyle=head;ctx.beginPath();ctx.arc(h.x,h.y,hr,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;const fx=Math.cos(s.angle),fy=Math.sin(s.angle),px=-fy,py=fx,eo=Math.max(2.8,4*zoom),ef=Math.max(3.2,4.3*zoom),er=Math.max(1.7,2.7*zoom);ctx.fillStyle='#fff';for(const side of[-1,1]){ctx.beginPath();ctx.arc(h.x+fx*ef+px*eo*side,h.y+fy*ef+py*eo*side,er,0,Math.PI*2);ctx.fill()}ctx.restore();
+ if(!s.alive)return;
+ const pc=performanceConfig(),skin=s.isPlayer?currentSkin():null;
+ const body=skin?skin.body:s.color,head=skin?skin.head:s.color,accent=skin?skin.accent:'#ffffff';
+ const useTexture=s.isPlayer&&data.useCustomTexture&&customTextureReady&&customTextureSprite;
+ const visualStep=Math.max(1,Math.ceil(s.segments.length/pc.maxSegments));
+ for(let i=s.segments.length-1;i>=0;i-=visualStep){
+  const seg=s.segments[i],p=screenPos(seg.x,seg.y,zoom);
+  if(p.x<-40||p.x>W+40||p.y<-40||p.y>H+40)continue;
+  const r=Math.max(3.2,s.radius*(1-(i/Math.max(1,s.segments.length))*.25)*zoom);
+  if(useTexture){
+   ctx.drawImage(customTextureSprite,p.x-r,p.y-r,r*2,r*2);
+  }else{
+   ctx.fillStyle=body;ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();
+   if(s.isPlayer&&i%6===0){ctx.fillStyle=accent+'55';ctx.beginPath();ctx.arc(p.x-r*.2,p.y-r*.2,r*.3,0,Math.PI*2);ctx.fill()}
+  }
+ }
+ const h=screenPos(s.x,s.y,zoom),hr=Math.max(5,s.radius*zoom+1);
+ ctx.save();
+ if(pc.shadows){ctx.shadowColor=head;ctx.shadowBlur=10}
+ if(useTexture)ctx.drawImage(customTextureSprite,h.x-hr,h.y-hr,hr*2,hr*2);
+ else{ctx.fillStyle=head;ctx.beginPath();ctx.arc(h.x,h.y,hr,0,Math.PI*2);ctx.fill()}
+ ctx.shadowBlur=0;
+ const fx=Math.cos(s.angle),fy=Math.sin(s.angle),px=-fy,py=fx,eo=Math.max(2.8,4*zoom),ef=Math.max(3.2,4.3*zoom),er=Math.max(1.7,2.7*zoom);
+ ctx.fillStyle='#fff';for(const side of[-1,1]){ctx.beginPath();ctx.arc(h.x+fx*ef+px*eo*side,h.y+fy*ef+py*eo*side,er,0,Math.PI*2);ctx.fill()}
+ ctx.restore();
  if(!s.isPlayer){ctx.font='600 '+Math.max(8,10*zoom)+'px Arial';ctx.textAlign='center';ctx.fillStyle='rgba(238,249,255,.82)';ctx.fillText(s.name,h.x,h.y-17*zoom)}
 }
 function drawRadar(){
@@ -1241,8 +1395,9 @@ document.addEventListener('visibilitychange',function(){
  last=performance.now();
 });
 
+let renderFrameCount=0;
 function frame(now){
- const dt=Math.min(.033,Math.max(0,(now-last)/1000));last=now;
+ const dt=Math.min(.033,Math.max(0,(now-last)/1000));last=now;renderFrameCount++;
  if(gameState===GAME_STATE.PLAYING&&started&&!paused&&run&&player&&player.alive){
   rebuildFoodGrid();rebuildBodyGrid();
   const activeSnakes=snakes.slice();
@@ -1255,7 +1410,7 @@ function frame(now){
   if(now-lastMissionSave>1800){data.missions.survival=Math.max(data.missions.survival,run.missionSurvivalBase+Math.floor(survival));scheduleSave();lastMissionSave=now}
  }
  if(player){
-  const z=currentZoom();drawBackground(z);drawFood(now/1000,z);const order=snakes.slice().sort(function(a,b){return a.length-b.length});for(const s of order)drawSnake(s,z);drawRadar();updateHUD();
+  const z=currentZoom();drawBackground(z);drawFood(now/1000,z);const order=snakes.slice().sort(function(a,b){return a.length-b.length});for(const s of order)drawSnake(s,z);if(renderFrameCount%performanceConfig().radarEvery===0)drawRadar();updateHUD();
  }
  requestAnimationFrame(frame);
 }
@@ -1302,9 +1457,9 @@ function releaseBoost(e){if(boostPointerId!==null&&e&&e.pointerId!==boostPointer
 $('boostBtn').addEventListener('pointerup',releaseBoost);$('boostBtn').addEventListener('pointercancel',releaseBoost);$('boostBtn').addEventListener('lostpointercapture',releaseBoost);
 $('emoteBtn').addEventListener('pointerdown',function(e){$('emoteBubble').textContent=currentEmote().emoji;emoteUntil=performance.now()+2000;e.preventDefault();e.stopPropagation()});
 
-applyDisplaySettings();refreshWallet();resetDailyMissionsIfNeeded();renderLobby();
+applyDisplaySettings();rebuildTextureSprite();refreshWallet();resetDailyMissionsIfNeeded();renderLobby();
 window.showScreen=showScreen;window.setDifficulty=setDifficulty;window.setWardrobeTab=setWardrobeTab;window.setSettingsTab=setSettingsTab;window.buySkin=buySkin;window.selectSkin=selectSkin;window.buyUpgrade=buyUpgrade;
-window.setControlMode=setControlMode;window.setHanded=setHanded;window.setControlValue=setControlValue;window.resetJoystickPosition=resetJoystickPosition;window.setDisplayValue=setDisplayValue;window.autoFitDisplay=autoFitDisplay;window.resetDisplay=resetDisplay;window.buyArena=buyArena;window.selectArena=selectArena;window.buyFood=buyFood;window.selectFood=selectFood;window.buyEmote=buyEmote;window.selectEmote=selectEmote;window.toggleSound=toggleSound;
+window.setControlMode=setControlMode;window.setHanded=setHanded;window.setControlValue=setControlValue;window.resetJoystickPosition=resetJoystickPosition;window.setDisplayValue=setDisplayValue;window.autoFitDisplay=autoFitDisplay;window.resetDisplay=resetDisplay;window.setPerformanceMode=setPerformanceMode;window.savePlayerName=savePlayerName;window.openTexturePicker=openTexturePicker;window.handleTextureFile=handleTextureFile;window.toggleCustomTexture=toggleCustomTexture;window.removeCustomTexture=removeCustomTexture;window.buyArena=buyArena;window.selectArena=selectArena;window.buyFood=buyFood;window.selectFood=selectFood;window.buyEmote=buyEmote;window.selectEmote=selectEmote;window.toggleSound=toggleSound;
 window.openDaily=openDaily;window.claimDaily=claimDaily;window.openMissions=openMissions;window.claimMission=claimMission;window.closeModal=closeModal;window.startMatch=startMatch;window.startNewMatch=startNewMatch;window.restartMatch=restartMatch;window.resumeGame=resumeGame;window.quitToLobby=quitToLobby;window.returnToMenuFromGameOver=returnToMenuFromGameOver;
 window.handleAndroidBack=function(){
  if($('dailyModal').classList.contains('show')){closeModal('dailyModal');return true}
