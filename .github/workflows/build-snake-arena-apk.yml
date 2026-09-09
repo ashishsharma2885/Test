@@ -1,4 +1,4 @@
-name: Build Snake Arena Tiny Start APK
+name: Build Snake Arena Lifecycle Fix APK
 
 on:
   push:
@@ -81,8 +81,8 @@ jobs:
                   applicationId 'com.snakearena.game'
                   minSdk 24
                   targetSdk 35
-                  versionCode 13
-                  versionName '3.6.0'
+                  versionCode 14
+                  versionName '3.7.0'
               }
 
               buildTypes {
@@ -332,15 +332,41 @@ jobs:
           PY
           node --check /tmp/snake-game.js
 
+      - name: Validate match lifecycle
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html=Path("app/src/main/assets/game.html").read_text()
+          required=[
+              "GAME_STATE=Object.freeze",
+              "function cleanupPreviousMatch(",
+              "function startNewMatch(",
+              "matchGeneration++",
+              "clearMatchTimeouts();",
+              "scheduleBotRespawn(this,",
+              "gameState=GAME_STATE.PLAYING",
+              "gameState=GAME_STATE.GAME_OVER",
+              "returnToMenuFromGameOver()",
+              "PLAYER_START_LENGTH=3",
+          ]
+          missing=[x for x in required if x not in html]
+          if missing:
+              raise SystemExit("Lifecycle validation missing: "+", ".join(missing))
+          if "setTimeout(()=>{if(!this.alive&&!this.isPlayer)this.respawn(false)" in html:
+              raise SystemExit("Legacy bot respawn timer still present")
+          print("Lifecycle structure validated")
+          PY
+
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v3.6-length-3.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v3.7-lifecycle-fix.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Snake-Arena-IO-v3.6-Length-3-APK
-          path: Snake-Arena-IO-v3.6-length-3.apk
+          name: Snake-Arena-IO-v3.7-Lifecycle-Fix-APK
+          path: Snake-Arena-IO-v3.7-lifecycle-fix.apk
           if-no-files-found: error
