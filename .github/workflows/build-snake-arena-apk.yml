@@ -1,0 +1,292 @@
+name: Build Snake Arena APK
+
+on:
+  push:
+    branches:
+      - snake-arena-apk-build
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Create Android project
+        shell: bash
+        run: |
+          mkdir -p app/src/main/java/com/snakearena/game
+          mkdir -p app/src/main/assets
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = 'SnakeArena'
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=false
+          android.nonTransitiveRClass=true
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'com.snakearena.game'
+              compileSdk 35
+              defaultConfig {
+                  applicationId 'com.snakearena.game'
+                  minSdk 24
+                  targetSdk 35
+                  versionCode 1
+                  versionName '1.0.0'
+              }
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:allowBackup="true"
+                  android:hardwareAccelerated="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="Snake Arena"
+                  android:theme="@style/AppTheme">
+                  <activity
+                      android:name=".MainActivity"
+                      android:configChanges="keyboardHidden|orientation|screenSize"
+                      android:exported="true"
+                      android:screenOrientation="sensorLandscape">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowFullscreen">true</item>
+                  <item name="android:navigationBarColor">#050D16</item>
+                  <item name="android:statusBarColor">#050D16</item>
+                  <item name="android:windowLightStatusBar">false</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_launcher.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="48dp" android:height="48dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#071827" android:pathData="M0,0h108v108h-108z"/>
+              <path android:fillColor="#54E7FF" android:pathData="M78,31 C68,20 47,19 35,29 C23,39 25,56 39,62 C49,66 63,63 68,70 C73,77 63,86 52,84 C43,83 37,78 34,72 L24,78 C30,91 45,98 59,96 C76,94 89,82 88,68 C87,54 75,48 62,47 C50,46 42,48 38,43 C34,38 40,31 48,29 C57,27 65,30 70,36 Z"/>
+              <path android:fillColor="#FFFFFF" android:pathData="M69,31 m-4,0 a4,4 0,1 0,8 0 a4,4 0,1 0,-8 0"/>
+          </vector>
+          EOF
+
+          cat > app/src/main/java/com/snakearena/game/MainActivity.java <<'EOF'
+          package com.snakearena.game;
+
+          import android.annotation.SuppressLint;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.Window;
+          import android.view.WindowManager;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+
+              @Override
+              @SuppressLint("SetJavaScriptEnabled")
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  requestWindowFeature(Window.FEATURE_NO_TITLE);
+                  getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  immersive();
+
+                  webView = new WebView(this);
+                  setContentView(webView);
+
+                  WebSettings s = webView.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setAllowFileAccess(true);
+                  s.setBuiltInZoomControls(false);
+                  s.setDisplayZoomControls(false);
+                  s.setSupportZoom(false);
+
+                  webView.setBackgroundColor(0xFF050D16);
+                  webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+                  webView.setVerticalScrollBarEnabled(false);
+                  webView.setHorizontalScrollBarEnabled(false);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient());
+                  webView.loadUrl("file:///android_asset/game.html");
+              }
+
+              private void immersive() {
+                  getWindow().getDecorView().setSystemUiVisibility(
+                      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
+                      View.SYSTEM_UI_FLAG_FULLSCREEN |
+                      View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                      View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+                      View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+                      View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                  );
+              }
+
+              @Override public void onWindowFocusChanged(boolean focus) {
+                  super.onWindowFocusChanged(focus);
+                  if (focus) immersive();
+              }
+
+              @Override public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) webView.goBack();
+                  else super.onBackPressed();
+              }
+          }
+          EOF
+
+          cat > app/src/main/assets/game.html <<'EOF'
+          <!doctype html>
+          <html>
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+          <title>Snake Arena</title>
+          <style>
+          *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#06101b;font-family:Arial,sans-serif;color:#fff;touch-action:none}
+          canvas{display:block;width:100vw;height:100vh}
+          #ui{position:fixed;inset:0;pointer-events:none}
+          .glass{background:rgba(4,13,23,.74);border:1px solid rgba(255,255,255,.09);border-radius:14px;backdrop-filter:blur(8px)}
+          #stats{position:absolute;top:10px;left:10px;padding:9px 12px;font-size:12px;line-height:1.55}
+          #leaders{position:absolute;right:10px;top:10px;padding:9px 12px;width:170px;font-size:11px}
+          #leaders b{display:block;margin-bottom:5px}#list{margin:0;padding-left:18px;line-height:1.45}
+          #boost{position:absolute;right:22px;bottom:22px;width:82px;height:82px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(39,170,255,.38);border:2px solid rgba(255,255,255,.28);font-weight:900;font-size:12px;pointer-events:auto;user-select:none}
+          #energy{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:34vw;max-width:330px;height:9px;background:rgba(255,255,255,.14);border-radius:20px;overflow:hidden}
+          #bar{height:100%;width:100%;background:linear-gradient(90deg,#64f0af,#54e7ff)}
+          #start,#dead{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(2,8,14,.78);pointer-events:auto}
+          #dead{display:none}.card{width:min(420px,90vw);padding:24px;text-align:center;background:#081827;border:1px solid rgba(255,255,255,.1);border-radius:20px}
+          h1{margin:0 0 9px;font-size:31px}.card p{font-size:13px;color:#b6c8d7;line-height:1.5}
+          button{border:0;border-radius:12px;padding:12px 20px;font-size:14px;font-weight:900;background:#5eecc6;color:#021318}
+          </style>
+          </head>
+          <body>
+          <canvas id="c"></canvas>
+          <div id="ui">
+            <div id="stats" class="glass">🐍 <b>Snake Arena</b><br>Score: <span id="sc">0</span><br>Length: <span id="ln">12</span><br>Rank: <span id="rk">-</span></div>
+            <div id="leaders" class="glass"><b>LEADERBOARD</b><ol id="list"></ol></div>
+            <div id="energy"><div id="bar"></div></div>
+            <div id="boost">BOOST</div>
+            <div id="start"><div class="card"><h1>Snake Arena</h1><p>Endless single-player arena. Start small, eat fruit to grow, survive 50 AI snakes, and collect loot from defeated snakes.</p><button id="play">PLAY</button></div></div>
+            <div id="dead"><div class="card"><h1>You Crashed</h1><p>Head touching another snake's body or tail means death.</p><button id="again">PLAY AGAIN</button></div></div>
+          </div>
+          <script>
+          (()=>{'use strict';
+          const c=document.getElementById('c'),x=c.getContext('2d'),$=s=>document.getElementById(s);
+          let W=innerWidth,H=innerHeight,D=Math.min(devicePixelRatio||1,2),started=false,last=performance.now();
+          function rs(){W=innerWidth;H=innerHeight;D=Math.min(devicePixelRatio||1,2);c.width=W*D;c.height=H*D;c.style.width=W+'px';c.style.height=H+'px';x.setTransform(D,0,0,D,0,0)}addEventListener('resize',rs);rs();
+          const WORLD=7000,FOODS=1200,BOTS=50,BASE=145,FAST=235,MIN=10,COLS=['#ff6575','#ffad56','#ffe16c','#63ef9b','#69d9ff','#a978ff','#ff7fca'],BC=['#ff6b6b','#7bdff2','#8aff80','#ff9f43','#c56cf0','#54a0ff','#00d2d3','#feca57'];
+          const names=['Nova','Viper','Rex','Comet','Blaze','Echo','Bolt','Luna','Dash','Venom','Titan','Skye','Astro','Cobra','Ghost','Turbo','Spark','Neon','Hunter','Raptor','Flash','Cosmo','Matrix','Volt'];
+          const R=(a,b)=>Math.random()*(b-a)+a,wrap=v=>((v%WORLD)+WORLD)%WORLD;
+          function td(a,b){let d=b-a;if(d>WORLD/2)d-=WORLD;if(d<-WORLD/2)d+=WORLD;return d}
+          const ds=(ax,ay,bx,by)=>Math.hypot(td(ax,bx),td(ay,by));
+          function ad(a,b){let d=(b-a+Math.PI)%(Math.PI*2)-Math.PI;return d<-Math.PI?d+Math.PI*2:d}
+          const ptr={x:W*.72,y:H*.5},food=[],snakes=[];let boost=false;
+          function addFood(px=R(0,WORLD),py=R(0,WORLD),value=null,loot=false){
+            let v=value,r;if(loot){v=v??2.6;r=R(5.5,8)}else{let z=Math.random();if(z<.58){v=v??.7;r=R(3.2,4.4)}else if(z<.9){v=v??1.25;r=R(4.5,5.8)}else{v=v??2.1;r=R(6,7.4)}}
+            food.push({x:wrap(px),y:wrap(py),v,r,loot,col:loot?'#ffd25e':COLS[Math.random()*COLS.length|0]})
+          }for(let i=0;i<FOODS;i++)addFood();
+          function safe(){for(let q=0;q<40;q++){let p={x:R(0,WORLD),y:R(0,WORLD)},ok=true;for(const s of snakes)if(s.alive&&ds(p.x,p.y,s.x,s.y)<220){ok=false;break}if(ok)return p}return{x:R(0,WORLD),y:R(0,WORLD)}}
+          class S{
+            constructor(name,col,me=false){this.name=name;this.col=col;this.me=me;this.radius=10.5;this.spacing=6;this.energy=1;this.ai={t:0,p:null,b:Math.random()};this.turn=me?4.8:R(2.4,3.4);this.score=0;this.respawn()}
+            respawn(){let p=safe();this.x=p.x;this.y=p.y;this.a=R(-Math.PI,Math.PI);this.alive=true;this.target=this.me?12:R(16,30);this.energy=1;this.hist=[];this.seg=[];this.ai.p=null;for(let i=0;i<500;i++)this.hist.push({x:this.x,y:this.y});this.sync()}
+            sync(){let n=Math.floor(this.target);while(this.seg.length<n)this.seg.push({x:this.x,y:this.y});if(this.seg.length>n)this.seg.length=n}
+            grow(v){this.target+=v*1.8;this.score+=Math.round(v*12);this.sync()}
+            die(){if(!this.alive)return;this.alive=false;for(let i=1;i<this.seg.length;i+=2){let p=this.seg[i];addFood(p.x+R(-8,8),p.y+R(-8,8),2.1,true)}if(this.me){$('dead').style.display='flex'}else setTimeout(()=>{this.score=0;this.respawn()},650+Math.random()*850)}
+            update(dt){if(!this.alive)return;if(this.me)this.player(dt);else this.bot(dt);this.x=wrap(this.x+Math.cos(this.a)*this.speed*dt);this.y=wrap(this.y+Math.sin(this.a)*this.speed*dt);this.hist.unshift({x:this.x,y:this.y});let m=Math.max(520,this.target*this.spacing+80);if(this.hist.length>m)this.hist.length=m;this.sync();for(let i=0;i<this.seg.length;i++){let p=this.hist[Math.min(this.hist.length-1,(i+1)*this.spacing|0)];this.seg[i].x=p.x;this.seg[i].y=p.y}this.eat()}
+            player(dt){let ta=Math.atan2(ptr.y-H/2,ptr.x-W/2);this.a+=ad(this.a,ta)*Math.min(1,this.turn*dt);if(boost&&this.energy>.02&&this.target>MIN){this.speed=FAST;this.energy=Math.max(0,this.energy-dt*.19)}else{this.speed=BASE;this.energy=Math.min(1,this.energy+dt*.105)}$('bar').style.width=(this.energy*100)+'%'}
+            bot(dt){this.ai.t-=dt;if(this.ai.t<=0||!this.ai.p){this.ai.t=R(.16,.36);let t=null,b=-1e9;for(let k=0;k<65;k++){let f=food[Math.random()*food.length|0];if(!f)continue;let d=ds(this.x,this.y,f.x,f.y),v=(f.loot?560:120)+f.v*60-d;if(d<850&&v>b){b=v;t={x:f.x,y:f.y,type:'food'}}}let danger=null,dd=9999;for(const s of snakes){if(s===this||!s.alive)continue;for(let i=4;i<s.seg.length;i+=7){let g=s.seg[i],d=ds(this.x,this.y,g.x,g.y);if(d<dd){dd=d;danger=g}}}if(danger&&dd<100){let dx=-td(this.x,danger.x),dy=-td(this.y,danger.y);t={x:wrap(this.x+dx*4),y:wrap(this.y+dy*4),type:'avoid'}}this.ai.p=t||{x:R(0,WORLD),y:R(0,WORLD),type:'wander'}}let p=this.ai.p,ta=Math.atan2(td(this.y,p.y),td(this.x,p.x));this.a+=ad(this.a,ta)*Math.min(1,this.turn*dt);let go=p.type==='food'&&this.ai.b>.45&&this.energy>.25;this.speed=go?FAST*.84:BASE;this.energy=go?Math.max(0,this.energy-dt*.13):Math.min(1,this.energy+dt*.08)}
+            eat(){for(let i=food.length-1;i>=0;i--){let f=food[i];if(ds(this.x,this.y,f.x,f.y)<this.radius+f.r+4){this.grow(f.v);food.splice(i,1)}}}
+          }
+          const me=new S('YOU','#52e9ff',true);snakes.push(me);for(let i=0;i<BOTS;i++)snakes.push(new S(names[i%names.length]+(i>=names.length?i:''),BC[i%BC.length]));
+          function collision(){for(const a of snakes){if(!a.alive)continue;for(const b of snakes){if(a===b||!b.alive)continue;for(let i=2;i<b.seg.length;i++){let g=b.seg[i],rr=b.radius*(1-(i/Math.max(1,b.seg.length))*.25);if(ds(a.x,a.y,g.x,g.y)<a.radius+rr-1.5){a.die();break}}if(!a.alive)break}}for(let i=0;i<snakes.length;i++){let a=snakes[i];if(!a.alive)continue;for(let j=i+1;j<snakes.length;j++){let b=snakes[j];if(b.alive&&ds(a.x,a.y,b.x,b.y)<a.radius+b.radius-3){a.die();b.die()}}}}
+          const sp=(wx,wy)=>({x:W/2+td(me.x,wx),y:H/2+td(me.y,wy)});
+          function draw(){let g=x.createRadialGradient(W/2,H/2,20,W/2,H/2,Math.max(W,H)*.75);g.addColorStop(0,'#132d47');g.addColorStop(1,'#050c14');x.fillStyle=g;x.fillRect(0,0,W,H);let G=110,sx=-(me.x%G)+W/2,sy=-(me.y%G)+H/2;x.beginPath();for(let q=sx-G;q<W+G;q+=G){x.moveTo(q,0);x.lineTo(q,H)}for(let q=sy-G;q<H+G;q+=G){x.moveTo(0,q);x.lineTo(W,q)}x.strokeStyle='rgba(255,255,255,.035)';x.stroke();for(const f of food){let p=sp(f.x,f.y);if(p.x<-20||p.x>W+20||p.y<-20||p.y>H+20)continue;x.save();if(f.loot){x.shadowColor=f.col;x.shadowBlur=16}x.fillStyle=f.col;x.beginPath();x.arc(p.x,p.y,f.r,0,7);x.fill();x.restore()}for(const s of [...snakes].sort((a,b)=>a.target-b.target)){if(!s.alive)continue;for(let i=s.seg.length-1;i>=0;i--){let p=sp(s.seg[i].x,s.seg[i].y),r=s.radius*(1-(i/Math.max(1,s.seg.length))*.25);x.fillStyle=s.col;x.beginPath();x.arc(p.x,p.y,r,0,7);x.fill()}let h=sp(s.x,s.y),fx=Math.cos(s.a),fy=Math.sin(s.a),px=-fy,py=fx;x.shadowColor=s.col;x.shadowBlur=12;x.fillStyle=s.col;x.beginPath();x.arc(h.x,h.y,s.radius+1,0,7);x.fill();x.shadowBlur=0;x.fillStyle='#fff';for(const k of [-1,1]){x.beginPath();x.arc(h.x+fx*4+px*4*k,h.y+fy*4+py*4*k,2.7,0,7);x.fill()}if(!s.me){x.font='10px Arial';x.textAlign='center';x.fillText(s.name,h.x,h.y-20)}}}
+          function hud(){let a=snakes.filter(s=>s.alive).sort((u,v)=>(v.score+v.target*2)-(u.score+u.target*2));$('sc').textContent=me.score|0;$('ln').textContent=me.target|0;$('rk').textContent=me.alive?(a.indexOf(me)+1)+'/'+a.length:'-';$('list').innerHTML=a.slice(0,6).map(s=>'<li style="'+(s===me?'color:#ffd25e;font-weight:bold':'')+'">'+s.name+' — '+((s.score+s.target*2)|0)+'</li>').join('')}
+          function reset(){me.score=0;me.respawn();$('dead').style.display='none'}
+          function loop(n){let dt=Math.min(.033,(n-last)/1000);last=n;if(started){for(const s of snakes)s.update(dt);collision();while(food.length<FOODS)addFood()}draw();hud();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+          function pos(e){let t=e.touches?e.touches[0]:e;if(t){ptr.x=t.clientX;ptr.y=t.clientY}}
+          c.addEventListener('touchstart',e=>{pos(e);e.preventDefault()},{passive:false});c.addEventListener('touchmove',e=>{pos(e);e.preventDefault()},{passive:false});c.addEventListener('mousemove',pos);
+          $('boost').addEventListener('pointerdown',e=>{boost=true;e.preventDefault()});addEventListener('pointerup',()=>boost=false);
+          $('play').onclick=()=>{started=true;$('start').style.display='none'};$('again').onclick=reset;
+          })();
+          </script>
+          </body></html>
+          EOF
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snake-Arena-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
