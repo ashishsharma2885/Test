@@ -1,4 +1,4 @@
-name: Build Snake Arena Thumbnail APK
+name: Build Snake Arena Joystick APK
 
 on:
   push:
@@ -81,8 +81,8 @@ jobs:
                   applicationId 'com.snakearena.game'
                   minSdk 24
                   targetSdk 35
-                  versionCode 3
-                  versionName '2.1.0'
+                  versionCode 4
+                  versionName '2.2.0'
               }
 
               buildTypes {
@@ -319,8 +319,12 @@ jobs:
           #leader{position:absolute;right:10px;top:10px;width:166px;padding:9px 11px;font-size:10px}
           #leader .title{font-size:10px;font-weight:900;letter-spacing:.11em;color:#c5d9e8;margin-bottom:5px}
           #list{padding-left:17px;margin:0;line-height:1.45}
-          #radarWrap{position:absolute;left:10px;bottom:10px;padding:6px}
-          #radar{width:82px;height:82px;border-radius:10px;display:block;background:rgba(0,0,0,.2)}
+          #radarWrap{position:absolute;left:14px;bottom:145px;padding:5px}
+          #radar{width:68px;height:68px;border-radius:9px;display:block;background:rgba(0,0,0,.2)}
+          #joystick{position:absolute;left:18px;bottom:18px;width:116px;height:116px;border-radius:50%;pointer-events:auto;touch-action:none;user-select:none;background:radial-gradient(circle at 42% 38%,rgba(98,223,255,.19),rgba(12,44,67,.48));border:2px solid rgba(255,255,255,.17);box-shadow:inset 0 0 26px rgba(72,217,255,.08),0 10px 30px rgba(0,0,0,.25)}
+          #joystick:before{content:"MOVE";position:absolute;left:0;right:0;top:13px;text-align:center;font-size:9px;font-weight:900;letter-spacing:.13em;color:rgba(220,245,255,.55)}
+          #stick{position:absolute;left:50%;top:50%;width:52px;height:52px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle at 35% 30%,#8df3ff,#2e9fc8 58%,#16637f);border:2px solid rgba(255,255,255,.42);box-shadow:0 5px 16px rgba(0,0,0,.35),inset 0 2px 6px rgba(255,255,255,.25);transition:box-shadow .1s}
+          #joystick.active #stick{box-shadow:0 3px 14px rgba(67,220,255,.48),inset 0 2px 6px rgba(255,255,255,.28)}
           #boostBtn{position:absolute;right:20px;bottom:20px;width:86px;height:86px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,rgba(111,229,255,.58),rgba(26,112,255,.33));border:2px solid rgba(255,255,255,.28);font-size:12px;font-weight:900;letter-spacing:.05em;pointer-events:auto;user-select:none;box-shadow:0 8px 30px rgba(45,160,255,.25)}
           #boostBtn.active{transform:scale(.95);background:radial-gradient(circle at 35% 30%,rgba(125,255,190,.7),rgba(24,141,255,.48))}
           #energy{position:absolute;left:50%;bottom:15px;transform:translateX(-50%);width:34vw;max-width:330px;height:9px;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden;border:1px solid rgba(255,255,255,.08)}
@@ -337,7 +341,10 @@ jobs:
             #stats{font-size:10px;padding:7px 9px}
             #leader{font-size:9px;width:150px;padding:7px 9px}
             #boostBtn{width:74px;height:74px;right:16px;bottom:16px}
-            #radar{width:70px;height:70px}
+            #joystick{width:98px;height:98px;left:14px;bottom:14px}
+            #stick{width:44px;height:44px}
+            #radarWrap{left:12px;bottom:120px}
+            #radar{width:58px;height:58px}
             #energy{bottom:10px}
           }
           </style>
@@ -357,6 +364,7 @@ jobs:
               <ol id="list"></ol>
             </div>
             <div id="radarWrap" class="glass"><canvas id="radar" width="82" height="82"></canvas></div>
+            <div id="joystick"><div id="stick"></div></div>
             <div id="energy"><div id="bar"></div></div>
             <div id="boostBtn">BOOST</div>
             <div id="start">
@@ -364,7 +372,7 @@ jobs:
                 <div class="eyebrow">Endless Single Player v2</div>
                 <h1>Snake Arena IO</h1>
                 <p>Start small. Eat fruits to grow. Survive 50 respawning AI snakes. If your head hits another snake's body or tail, you die.</p>
-                <p>Boost changes speed only — it never removes your length and never drops food from your tail.</p>
+                <p>Use the left joystick to steer and hold BOOST with your right thumb. Boost changes speed only — it never removes your length or drops food from your tail.</p>
                 <button id="play">PLAY ENDLESS</button>
               </div>
             </div>
@@ -459,6 +467,13 @@ jobs:
           let bodyGrid=new Map();
           const snakes=[];
           const pointer={x:W*.7,y:H*.5};
+          const joystick={
+            active:false,
+            pointerId:null,
+            x:0,
+            y:0,
+            max:39
+          };
 
           function spawnFood(x=rand(0,WORLD),y=rand(0,WORLD),value=null,loot=false){
             let v=value,r;
@@ -611,7 +626,9 @@ jobs:
             }
 
             updatePlayer(dt){
-              const target=Math.atan2(pointer.y-H/2,pointer.x-W/2);
+              const target=joystick.active&&Math.hypot(joystick.x,joystick.y)>.12
+                ? Math.atan2(joystick.y,joystick.x)
+                : Math.atan2(pointer.y-H/2,pointer.x-W/2);
               this.angle+=angleDiff(this.angle,target)*Math.min(1,this.turnRate*dt);
               if(boost&&this.energy>.02&&this.length>MIN_LENGTH){
                 this.speed=BOOST_SPEED;
@@ -881,6 +898,9 @@ jobs:
             paused=false;
             boost=false;
             $('boostBtn').classList.remove('active');
+            joystick.active=false;joystick.pointerId=null;joystick.x=0;joystick.y=0;
+            $('joystick').classList.remove('active');
+            $('stick').style.transform='translate(-50%,-50%)';
             pointer.x=W*.7;pointer.y=H*.5;
           }
 
@@ -927,27 +947,80 @@ jobs:
           requestAnimationFrame(frame);
 
           function steerFromEvent(e){
-            const t=e.touches?e.touches[0]:e;
-            if(t){pointer.x=t.clientX;pointer.y=t.clientY}
+            pointer.x=e.clientX;
+            pointer.y=e.clientY;
           }
 
-          canvas.addEventListener('touchstart',e=>{steerFromEvent(e);e.preventDefault()},{passive:false});
-          canvas.addEventListener('touchmove',e=>{steerFromEvent(e);e.preventDefault()},{passive:false});
           canvas.addEventListener('mousemove',steerFromEvent);
 
-          $('boostBtn').addEventListener('pointerdown',e=>{
-            boost=true;
-            $('boostBtn').classList.add('active');
+          const joy=$('joystick');
+          const stick=$('stick');
+
+          function updateJoystick(e){
+            const rect=joy.getBoundingClientRect();
+            const cx=rect.left+rect.width/2;
+            const cy=rect.top+rect.height/2;
+            let dx=e.clientX-cx;
+            let dy=e.clientY-cy;
+            const max=Math.min(rect.width,rect.height)*.34;
+            const dist=Math.hypot(dx,dy);
+            if(dist>max){
+              dx=dx/dist*max;
+              dy=dy/dist*max;
+            }
+            joystick.x=dx/max;
+            joystick.y=dy/max;
+            stick.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
+          }
+
+          function releaseJoystick(e){
+            if(!joystick.active)return;
+            if(e&&joystick.pointerId!==null&&e.pointerId!==joystick.pointerId)return;
+            joystick.active=false;
+            joystick.pointerId=null;
+            joystick.x=0;joystick.y=0;
+            joy.classList.remove('active');
+            stick.style.transform='translate(-50%,-50%)';
+          }
+
+          joy.addEventListener('pointerdown',e=>{
+            joystick.active=true;
+            joystick.pointerId=e.pointerId;
+            joy.classList.add('active');
+            joy.setPointerCapture&&joy.setPointerCapture(e.pointerId);
+            updateJoystick(e);
+            e.preventDefault();
+            e.stopPropagation();
+          });
+
+          joy.addEventListener('pointermove',e=>{
+            if(!joystick.active||e.pointerId!==joystick.pointerId)return;
+            updateJoystick(e);
             e.preventDefault();
           });
-          addEventListener('pointerup',()=>{
-            boost=false;
-            $('boostBtn').classList.remove('active');
+
+          joy.addEventListener('pointerup',releaseJoystick);
+          joy.addEventListener('pointercancel',releaseJoystick);
+          joy.addEventListener('lostpointercapture',releaseJoystick);
+
+          let boostPointerId=null;
+          $('boostBtn').addEventListener('pointerdown',e=>{
+            boost=true;
+            boostPointerId=e.pointerId;
+            $('boostBtn').classList.add('active');
+            $('boostBtn').setPointerCapture&&$('boostBtn').setPointerCapture(e.pointerId);
+            e.preventDefault();
+            e.stopPropagation();
           });
-          addEventListener('pointercancel',()=>{
+          function releaseBoost(e){
+            if(boostPointerId!==null&&e&&e.pointerId!==boostPointerId)return;
             boost=false;
+            boostPointerId=null;
             $('boostBtn').classList.remove('active');
-          });
+          }
+          $('boostBtn').addEventListener('pointerup',releaseBoost);
+          $('boostBtn').addEventListener('pointercancel',releaseBoost);
+          $('boostBtn').addEventListener('lostpointercapture',releaseBoost);
 
           $('play').onclick=()=>{
             started=true;
@@ -972,11 +1045,11 @@ jobs:
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-thumbnail.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-joystick.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Snake-Arena-IO-Thumbnail-APK
+          name: Snake-Arena-IO-Joystick-APK
           path: Snake-Arena-IO-thumbnail.apk
           if-no-files-found: error
