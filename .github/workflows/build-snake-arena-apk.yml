@@ -1,4 +1,4 @@
-name: Build Snake Arena Progression APK
+name: Build Snake Arena Difficulty APK
 
 on:
   push:
@@ -81,8 +81,8 @@ jobs:
                   applicationId 'com.snakearena.game'
                   minSdk 24
                   targetSdk 35
-                  versionCode 7
-                  versionName '3.0.0'
+                  versionCode 8
+                  versionName '3.1.0'
               }
 
               buildTypes {
@@ -320,11 +320,11 @@ jobs:
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v3.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v3.1-difficulty.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Snake-Arena-IO-v3.0-APK
-          path: Snake-Arena-IO-v3.0.apk
+          name: Snake-Arena-IO-v3.1-Difficulty-APK
+          path: Snake-Arena-IO-v3.1-difficulty.apk
           if-no-files-found: error
