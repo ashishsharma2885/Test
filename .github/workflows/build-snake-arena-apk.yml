@@ -1,4 +1,4 @@
-name: Build Snake Arena Joystick APK
+name: Build Snake Arena Live Map APK
 
 on:
   push:
@@ -81,8 +81,8 @@ jobs:
                   applicationId 'com.snakearena.game'
                   minSdk 24
                   targetSdk 35
-                  versionCode 4
-                  versionName '2.2.0'
+                  versionCode 5
+                  versionName '2.3.0'
               }
 
               buildTypes {
@@ -319,8 +319,9 @@ jobs:
           #leader{position:absolute;right:10px;top:10px;width:166px;padding:9px 11px;font-size:10px}
           #leader .title{font-size:10px;font-weight:900;letter-spacing:.11em;color:#c5d9e8;margin-bottom:5px}
           #list{padding-left:17px;margin:0;line-height:1.45}
-          #radarWrap{position:absolute;left:14px;bottom:145px;padding:5px}
-          #radar{width:68px;height:68px;border-radius:9px;display:block;background:rgba(0,0,0,.2)}
+          #radarWrap{position:absolute;left:14px;bottom:145px;padding:6px}
+          #radarWrap:before{content:"LIVE MAP";display:block;text-align:center;font-size:8px;font-weight:900;letter-spacing:.12em;color:rgba(220,245,255,.65);margin-bottom:4px}
+          #radar{width:92px;height:92px;border-radius:10px;display:block;background:rgba(0,0,0,.22)}
           #joystick{position:absolute;left:18px;bottom:18px;width:116px;height:116px;border-radius:50%;pointer-events:auto;touch-action:none;user-select:none;background:radial-gradient(circle at 42% 38%,rgba(98,223,255,.19),rgba(12,44,67,.48));border:2px solid rgba(255,255,255,.17);box-shadow:inset 0 0 26px rgba(72,217,255,.08),0 10px 30px rgba(0,0,0,.25)}
           #joystick:before{content:"MOVE";position:absolute;left:0;right:0;top:13px;text-align:center;font-size:9px;font-weight:900;letter-spacing:.13em;color:rgba(220,245,255,.55)}
           #stick{position:absolute;left:50%;top:50%;width:52px;height:52px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle at 35% 30%,#8df3ff,#2e9fc8 58%,#16637f);border:2px solid rgba(255,255,255,.42);box-shadow:0 5px 16px rgba(0,0,0,.35),inset 0 2px 6px rgba(255,255,255,.25);transition:box-shadow .1s}
@@ -343,8 +344,8 @@ jobs:
             #boostBtn{width:74px;height:74px;right:16px;bottom:16px}
             #joystick{width:98px;height:98px;left:14px;bottom:14px}
             #stick{width:44px;height:44px}
-            #radarWrap{left:12px;bottom:120px}
-            #radar{width:58px;height:58px}
+            #radarWrap{left:12px;bottom:118px}
+            #radar{width:76px;height:76px}
             #energy{bottom:10px}
           }
           </style>
@@ -372,7 +373,7 @@ jobs:
                 <div class="eyebrow">Endless Single Player v2</div>
                 <h1>Snake Arena IO</h1>
                 <p>Start small. Eat fruits to grow. Survive 50 respawning AI snakes. If your head hits another snake's body or tail, you die.</p>
-                <p>Use the left joystick to steer and hold BOOST with your right thumb. Boost changes speed only — it never removes your length or drops food from your tail.</p>
+                <p>Use the left joystick to steer and hold BOOST with your right thumb. The LIVE MAP follows your snake, keeps you in the center, and shows nearby AI snakes moving around you.</p>
                 <button id="play">PLAY ENDLESS</button>
               </div>
             </div>
@@ -868,16 +869,133 @@ jobs:
 
           function drawRadar(){
             const w=radar.width,h=radar.height;
+            const cx=w/2,cy=h/2;
+            const radarRange=1500;
+            const scale=(Math.min(w,h)*.46)/radarRange;
+
             rctx.clearRect(0,0,w,h);
-            rctx.fillStyle='#061522';rctx.fillRect(0,0,w,h);
-            rctx.strokeStyle='rgba(255,255,255,.08)';rctx.strokeRect(.5,.5,w-1,h-1);
-            for(const s of snakes){
-              if(!s.alive)continue;
-              rctx.fillStyle=s.isPlayer?'#ffffff':s.color;
-              rctx.beginPath();
-              rctx.arc(s.x/WORLD*w,s.y/WORLD*h,s.isPlayer?2.8:1.5,0,Math.PI*2);
-              rctx.fill();
+
+            const bg=rctx.createRadialGradient(cx,cy,4,cx,cy,Math.min(w,h)*.7);
+            bg.addColorStop(0,'#102d43');
+            bg.addColorStop(1,'#05111d');
+            rctx.fillStyle=bg;
+            rctx.fillRect(0,0,w,h);
+
+            // Moving world grid: the map scrolls beneath the player as the player moves.
+            const worldGrid=300;
+            const gridPx=worldGrid*scale;
+            const offsetX=((player.x%worldGrid)+worldGrid)%worldGrid*scale;
+            const offsetY=((player.y%worldGrid)+worldGrid)%worldGrid*scale;
+
+            rctx.beginPath();
+            for(let gx=cx-offsetX-gridPx;gx<w+gridPx;gx+=gridPx){
+              rctx.moveTo(gx,0);rctx.lineTo(gx,h);
             }
+            for(let gy=cy-offsetY-gridPx;gy<h+gridPx;gy+=gridPx){
+              rctx.moveTo(0,gy);rctx.lineTo(w,gy);
+            }
+            rctx.strokeStyle='rgba(119,214,255,.10)';
+            rctx.lineWidth=1;
+            rctx.stroke();
+
+            // Local radar rings.
+            rctx.beginPath();
+            rctx.arc(cx,cy,Math.min(w,h)*.23,0,Math.PI*2);
+            rctx.arc(cx,cy,Math.min(w,h)*.45,0,Math.PI*2);
+            rctx.strokeStyle='rgba(255,255,255,.08)';
+            rctx.stroke();
+
+            // Nearby food as faint tiny dots so the map feels alive.
+            const foodBuckets=neighborBuckets(foodGrid,player.x,player.y,FOOD_CELL,FOOD_CELLS,8);
+            let foodDrawn=0;
+            rctx.fillStyle='rgba(255,215,92,.30)';
+            for(const bucket of foodBuckets){
+              for(const f of bucket){
+                if(!f.alive||foodDrawn>90)continue;
+                const dx=delta(player.x,f.x);
+                const dy=delta(player.y,f.y);
+                if(Math.abs(dx)>radarRange||Math.abs(dy)>radarRange)continue;
+                const rx=cx+dx*scale,ry=cy+dy*scale;
+                if(rx<2||rx>w-2||ry<2||ry>h-2)continue;
+                rctx.fillRect(rx,ry,1,1);
+                foodDrawn++;
+              }
+            }
+
+            // AI snakes move relative to the player. Off-screen AI get edge indicators.
+            for(const s of snakes){
+              if(!s.alive||s===player)continue;
+              const dx=delta(player.x,s.x);
+              const dy=delta(player.y,s.y);
+              const d=Math.hypot(dx,dy);
+
+              if(d<=radarRange){
+                const rx=cx+dx*scale;
+                const ry=cy+dy*scale;
+
+                // Short body trail so each snake is clearly visible as a snake, not just a dot.
+                rctx.strokeStyle=s.color;
+                rctx.lineWidth=1.4;
+                rctx.beginPath();
+                let startedTrail=false;
+                for(let i=0;i<s.segments.length;i+=Math.max(2,Math.ceil(s.segments.length/10))){
+                  const seg=s.segments[i];
+                  const sdx=delta(player.x,seg.x);
+                  const sdy=delta(player.y,seg.y);
+                  if(Math.abs(sdx)>radarRange||Math.abs(sdy)>radarRange)continue;
+                  const sx=cx+sdx*scale,sy=cy+sdy*scale;
+                  if(!startedTrail){rctx.moveTo(sx,sy);startedTrail=true}
+                  else rctx.lineTo(sx,sy);
+                }
+                if(startedTrail)rctx.stroke();
+
+                rctx.fillStyle=s.color;
+                rctx.beginPath();
+                rctx.arc(rx,ry,2.4,0,Math.PI*2);
+                rctx.fill();
+              }else{
+                const ang=Math.atan2(dy,dx);
+                const er=Math.min(w,h)*.43;
+                const ex=cx+Math.cos(ang)*er;
+                const ey=cy+Math.sin(ang)*er;
+                rctx.fillStyle=s.color;
+                rctx.beginPath();
+                rctx.arc(ex,ey,1.4,0,Math.PI*2);
+                rctx.fill();
+              }
+            }
+
+            // Player is always centered, with a direction arrow and a small body trail.
+            rctx.strokeStyle='#ffffff';
+            rctx.lineWidth=2;
+            rctx.beginPath();
+            let playerTrailStarted=false;
+            for(let i=0;i<player.segments.length;i+=Math.max(1,Math.ceil(player.segments.length/12))){
+              const seg=player.segments[i];
+              const dx=delta(player.x,seg.x);
+              const dy=delta(player.y,seg.y);
+              const px=cx+dx*scale,py=cy+dy*scale;
+              if(!playerTrailStarted){rctx.moveTo(px,py);playerTrailStarted=true}
+              else rctx.lineTo(px,py);
+            }
+            if(playerTrailStarted)rctx.stroke();
+
+            rctx.save();
+            rctx.translate(cx,cy);
+            rctx.rotate(player.angle);
+            rctx.fillStyle='#ffffff';
+            rctx.beginPath();
+            rctx.moveTo(5,0);
+            rctx.lineTo(-3.5,-3);
+            rctx.lineTo(-2,0);
+            rctx.lineTo(-3.5,3);
+            rctx.closePath();
+            rctx.fill();
+            rctx.restore();
+
+            rctx.strokeStyle='rgba(255,255,255,.18)';
+            rctx.lineWidth=1;
+            rctx.strokeRect(.5,.5,w-1,h-1);
           }
 
           function updateHud(){
@@ -1045,11 +1163,11 @@ jobs:
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-joystick.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-live-map.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Snake-Arena-IO-Joystick-APK
+          name: Snake-Arena-IO-Live-Map-APK
           path: Snake-Arena-IO-joystick.apk
           if-no-files-found: error
