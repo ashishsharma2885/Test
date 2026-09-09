@@ -131,7 +131,8 @@ input[type=range]{width:100%}
 #emoteBubble{position:absolute;display:none;z-index:8;font-size:34px;filter:drop-shadow(0 3px 4px #000);pointer-events:none}
 @media(max-height:430px){
   .topbar{height:60px}.brandTitle{font-size:25px}.tabs{height:50px}.tabBtn{height:44px;font-size:15px}.content{height:calc(100vh - 110px);padding:10px}
-  .lobbyHUD{grid-template-columns:170px 1fr 170px;grid-template-rows:75px 1fr 78px}.logoText{font-size:32px}.snakePreview{height:100px}.navBtn{height:54px;width:110px}
+  .lobbyHUD{grid-template-columns:170px 1fr 170px;grid-template-rows:75px 1fr 78px}.logoText{font-size:32px}.snakePreview{height:92px}.navBtn{height:54px;width:110px}
+  .difficultySelect{margin:2px 0 4px;padding:4px}.diffBtn{min-width:74px;padding:6px 9px;font-size:12px}.diffHint{font-size:9px;min-height:11px}
   #joystick{width:98px;height:98px;left:14px;bottom:14px}#stick{width:44px;height:44px}#radarWrap{left:12px;bottom:120px}#radar{width:74px;height:74px}
   #boostBtn{width:74px;height:74px;right:16px;bottom:16px}#emoteBtn{right:102px;bottom:24px;width:50px;height:50px;font-size:24px}
 }
@@ -407,7 +408,18 @@ function loadData(){
  }catch(e){}
  return d;
 }
-function saveData(){localStorage.setItem('snakeArenaProgressV3',JSON.stringify(data))}
+let saveTimer=null;
+function saveData(){
+ if(saveTimer){clearTimeout(saveTimer);saveTimer=null}
+ localStorage.setItem('snakeArenaProgressV3',JSON.stringify(data));
+}
+function scheduleSave(){
+ if(saveTimer)clearTimeout(saveTimer);
+ saveTimer=setTimeout(function(){
+  saveTimer=null;
+  localStorage.setItem('snakeArenaProgressV3',JSON.stringify(data));
+ },450);
+}
 function xpNeeded(level){return 300+(level-1)*170}
 function applyXP(amount){
  let before=data.level;
@@ -423,7 +435,7 @@ function addCoins(amount){
  const real=Math.max(0,Math.floor(amount));
  data.coins+=real;data.stats.totalCoins+=real;
  if(data.missions.date===todayKey())data.missions.coins+=real;
- saveData();refreshWallet();
+ scheduleSave();refreshWallet();
  return real;
 }
 function spendCoins(amount){
@@ -578,6 +590,17 @@ function toast(msg){
 function closeModal(id){$(id).classList.remove('show')}
 function openDaily(){renderDaily();$('dailyModal').classList.add('show')}
 function canClaimDaily(){return data.daily.lastClaim!==todayKey()}
+function dayStamp(key){
+ if(!key)return null;
+ const p=key.split('-').map(Number);
+ if(p.length!==3||p.some(function(n){return !Number.isFinite(n)}))return null;
+ return Date.UTC(p[0],p[1]-1,p[2]);
+}
+function dayDifference(fromKey,toKey){
+ const a=dayStamp(fromKey),b=dayStamp(toKey);
+ if(a===null||b===null)return null;
+ return Math.round((b-a)/86400000);
+}
 function renderDaily(){
  const rewards=[100,150,200,250,300,400,750],nextIndex=data.daily.streak%7;
  $('rewardDays').innerHTML=rewards.map(function(v,i){return '<div class="rewardDay card '+(i===nextIndex?'current':'')+'"><b>Day '+(i+1)+'</b><div style="font-size:28px;margin:8px">🪙</div><strong>'+v+'</strong></div>'}).join('');
@@ -585,8 +608,11 @@ function renderDaily(){
 }
 function claimDaily(){
  if(!canClaimDaily())return;
+ const today=todayKey();
+ const gap=dayDifference(data.daily.lastClaim,today);
+ if(data.daily.lastClaim&&gap!==1)data.daily.streak=0;
  const rewards=[100,150,200,250,300,400,750],reward=rewards[data.daily.streak%7];
- addCoins(reward);data.daily.streak=(data.daily.streak+1)%7;data.daily.lastClaim=todayKey();saveData();renderDaily();renderLobby();toast('Daily reward: +'+reward+' coins');
+ addCoins(reward);data.daily.streak=(data.daily.streak+1)%7;data.daily.lastClaim=today;saveData();renderDaily();renderLobby();toast('Daily reward: +'+reward+' coins');
 }
 
 const MISSION_DEFS=[
@@ -646,7 +672,20 @@ function spawnFood(x=rand(0,WORLD),y=rand(0,WORLD),value=null,loot=false){
  foods.push({x:wrap(x),y:wrap(y),v:v,r:r,loot:loot,golden:golden,alive:true,ttl:loot?45:1e9,phase:rand(0,Math.PI*2),emoji:currentFoodTheme().emoji[Math.random()*currentFoodTheme().emoji.length|0]});
 }
 function rebuildFoodGrid(){foodGrid=new Map();for(const f of foods){if(!f.alive)continue;const k=cellKey(f.x,f.y,FOOD_CELL,FOOD_CELLS);let b=foodGrid.get(k);if(!b){b=[];foodGrid.set(k,b)}b.push(f)}}
-function rebuildBodyGrid(){bodyGrid=new Map();for(const s of snakes){if(!s.alive)continue;const step=Math.max(2,Math.floor(s.segments.length/120));for(let i=2;i<s.segments.length;i+=step){const g=s.segments[i],taper=1-(i/Math.max(1,s.segments.length))*.25,item={owner:s,index:i,x:g.x,y:g.y,r:s.radius*taper},k=cellKey(g.x,g.y,BODY_CELL,BODY_CELLS);let b=bodyGrid.get(k);if(!b){b=[];bodyGrid.set(k,b)}b.push(item)}}}
+function rebuildBodyGrid(){
+ bodyGrid=new Map();
+ for(const s of snakes){
+  if(!s.alive)continue;
+  const step=Math.max(1,Math.ceil(s.segments.length/320));
+  const bridge=Math.min(10,(step-1)*s.spacing*.45);
+  for(let i=2;i<s.segments.length;i+=step){
+   const g=s.segments[i],taper=1-(i/Math.max(1,s.segments.length))*.25;
+   const item={owner:s,index:i,x:g.x,y:g.y,r:s.radius*taper+bridge};
+   const k=cellKey(g.x,g.y,BODY_CELL,BODY_CELLS);
+   let b=bodyGrid.get(k);if(!b){b=[];bodyGrid.set(k,b)}b.push(item);
+  }
+ }
+}
 function safeSpawn(){for(let n=0;n<60;n++){const p={x:rand(0,WORLD),y:rand(0,WORLD)};let ok=true;for(const s of snakes){if(!s.alive)continue;if(distance(p.x,p.y,s.x,s.y)<280){ok=false;break}}if(ok)return p}return{x:rand(0,WORLD),y:rand(0,WORLD)}}
 
 class Snake{
@@ -654,11 +693,12 @@ class Snake{
   this.name=name;this.color=color;this.isPlayer=!!isPlayer;this.radius=10.5;this.spacing=6;this.turnRate=this.isPlayer?4.9:rand(2.5,3.5);this.cruise=rand(.97,1.03);this.ai={
    timer:0,target:null,bravery:Math.random(),targetAge:0,
    roamAngle:rand(-Math.PI,Math.PI),stuckTime:0,moveCheck:0,
-   lastX:0,lastY:0,fightSide:Math.random()<.5?-1:1
+   lastX:0,lastY:0,fightSide:Math.random()<.5?-1:1,
+   boosting:false,boostTimer:0
   };this.score=0;this.respawn(true);
  }
  respawn(first){
-  const p=safeSpawn();this.x=p.x;this.y=p.y;this.angle=rand(-Math.PI,Math.PI);this.alive=true;this.length=this.isPlayer?12:rand(16,30);this.energy=1;this.speed=BASE_SPEED;this.history=[];this.segments=[];this.ai.target=null;this.ai.timer=0;this.ai.targetAge=0;this.ai.stuckTime=0;this.ai.moveCheck=0;this.ai.lastX=this.x;this.ai.lastY=this.y;this.ai.roamAngle=this.angle+rand(-1.2,1.2);
+  const p=safeSpawn();this.x=p.x;this.y=p.y;this.angle=rand(-Math.PI,Math.PI);this.alive=true;this.length=this.isPlayer?12:rand(16,30);this.energy=1;this.speed=BASE_SPEED;this.history=[];this.segments=[];this.ai.target=null;this.ai.timer=0;this.ai.targetAge=0;this.ai.stuckTime=0;this.ai.moveCheck=0;this.ai.lastX=this.x;this.ai.lastY=this.y;this.ai.roamAngle=this.angle+rand(-1.2,1.2);this.ai.boosting=false;this.ai.boostTimer=0;
   for(let i=0;i<150;i++)this.history.push({x:this.x,y:this.y});this.syncSegments();if(!first&&!this.isPlayer)this.score=0;
  }
  syncSegments(){
@@ -710,6 +750,7 @@ class Snake{
   this.ai.timer-=dt;
   this.ai.targetAge+=dt;
   this.ai.moveCheck+=dt;
+  this.ai.boostTimer-=dt;
 
   // Detect bots that are barely travelling and force a long new roaming route.
   if(this.ai.moveCheck>=.9){
@@ -808,10 +849,14 @@ class Snake{
   this.angle+=angleDiff(this.angle,ta)*Math.min(1,this.turnRate*cfg.turn*dt);
 
   const dToTarget=distance(this.x,this.y,p.x,p.y);
-  const wantsBoost=(p.type==='combat'||p.type==='food')&&
-    Math.random()<cfg.boostChance&&this.energy>cfg.boostEnergy&&dToTarget>190;
+  if(this.ai.boostTimer<=0){
+   this.ai.boosting=(p.type==='combat'||p.type==='food')&&
+     Math.random()<cfg.boostChance&&this.energy>cfg.boostEnergy&&dToTarget>190;
+   this.ai.boostTimer=rand(.45,.9);
+  }
+  if(this.energy<=.05||p.type==='avoid')this.ai.boosting=false;
 
-  if(wantsBoost){
+  if(this.ai.boosting){
    this.speed=BOOST_SPEED*.82*cfg.speed;
    this.energy=Math.max(0,this.energy-dt*.12);
   }else{
@@ -909,16 +954,16 @@ function updateHUD(){
 }
 
 function startMatch(){
- resetDailyMissionsIfNeeded();showScreen('gameScreen');started=true;paused=false;boost=false;run={fruits:0,bots:0,coins:0,xp:0,maxLength:12,startLevel:data.level,startXP:data.xp};runStart=performance.now();lastMinuteReward=0;data.stats.gamesPlayed++;saveData();
+ resetDailyMissionsIfNeeded();showScreen('gameScreen');started=true;paused=false;boost=false;run={fruits:0,bots:0,coins:0,xp:0,maxLength:12,startLevel:data.level,startXP:data.xp,elapsed:0,missionSurvivalBase:data.missions.survival};runStart=performance.now();lastMinuteReward=0;data.stats.gamesPlayed++;saveData();
  player=initWorld();joystick.lastAngle=player.angle;pointer.lastMove=0;pointer.down=false;$('pauseOverlay').classList.remove('show');$('emoteBtn').textContent=currentEmote().emoji;applyControlLayout();last=performance.now();
 }
 function finishMatch(){
  if(!run)return;
- paused=true;started=false;const survival=(performance.now()-runStart)/1000,rank=currentRank();run.maxLength=Math.max(run.maxLength,Math.floor(player.length));
+ paused=true;started=false;const survival=run.elapsed,rank=currentRank();run.maxLength=Math.max(run.maxLength,Math.floor(player.length));
  let placementCoins=0;if(rank===1){placementCoins+=100;data.stats.gamesWon++}else if(rank<=5)placementCoins+=50;if(placementCoins){run.coins+=placementCoins;addCoins(placementCoins)}
  run.xp+=Math.floor(player.score/80)+run.bots*15+Math.floor(survival/30)*8;
  const levelInfo=applyXP(run.xp);data.stats.bestScore=Math.max(data.stats.bestScore,Math.floor(player.score));data.stats.maxLength=Math.max(data.stats.maxLength,run.maxLength);data.stats.bestSurvival=Math.max(data.stats.bestSurvival,survival);data.stats.totalPlayTime+=survival;
- data.missions.survival+=Math.floor(survival);data.missions.maxLength=Math.max(data.missions.maxLength,run.maxLength);saveData();
+ data.missions.survival=Math.max(data.missions.survival,run.missionSurvivalBase+Math.floor(survival));data.missions.maxLength=Math.max(data.missions.maxLength,run.maxLength);saveData();
  $('postStats').innerHTML=[
   ['SCORE',Math.floor(player.score)],['LENGTH',run.maxLength],['SURVIVAL',formatTime(survival)],['FRUITS',run.fruits],['BOTS',run.bots],['COINS','+'+run.coins],['XP','+'+run.xp],['RANK','#'+rank],['MODE',difficultyConfig().label]
  ].map(function(v){return '<div class="postStat card"><small>'+v[0]+'</small><strong>'+v[1]+'</strong></div>'}).join('');
@@ -926,7 +971,7 @@ function finishMatch(){
  $('postModal').classList.add('show');run=null;renderLobby();
 }
 function quitToLobby(){
- if(started&&run){const survival=(performance.now()-runStart)/1000;data.stats.totalPlayTime+=survival;saveData()}
+ if(started&&run){const survival=run.elapsed;data.stats.totalPlayTime+=survival;data.missions.survival=Math.max(data.missions.survival,run.missionSurvivalBase+Math.floor(survival));saveData()}
  started=false;paused=false;run=null;$('pauseOverlay').classList.remove('show');showScreen('lobby');
 }
 function setPaused(v){
@@ -942,9 +987,10 @@ function frame(now){
  const dt=Math.min(.033,Math.max(0,(now-last)/1000));last=now;
  if(started&&!paused&&player&&player.alive){
   rebuildFoodGrid();rebuildBodyGrid();for(const s of snakes)s.update(dt);rebuildBodyGrid();collisionCheck();updateFood(dt);rebuildFoodGrid();
-  const survival=(now-runStart)/1000;
+  run.elapsed+=dt;
+  const survival=run.elapsed;
   if(survival-lastMinuteReward>=60){lastMinuteReward+=60;const coins=Math.floor(10*(1+(data.upgrades.coin-1)*.05));run.coins+=coins;run.xp+=20;addCoins(coins);coinFeedback(coins)}
-  if(now-lastMissionSave>1800){data.missions.survival=Math.max(data.missions.survival,Math.floor(survival));saveData();lastMissionSave=now}
+  if(now-lastMissionSave>1800){data.missions.survival=Math.max(data.missions.survival,run.missionSurvivalBase+Math.floor(survival));scheduleSave();lastMissionSave=now}
  }
  if(player){
   const z=currentZoom();drawBackground(z);drawFood(now/1000,z);const order=snakes.slice().sort(function(a,b){return a.length-b.length});for(const s of order)drawSnake(s,z);drawRadar();updateHUD();
@@ -989,6 +1035,17 @@ refreshWallet();resetDailyMissionsIfNeeded();renderLobby();
 window.showScreen=showScreen;window.setDifficulty=setDifficulty;window.setWardrobeTab=setWardrobeTab;window.setSettingsTab=setSettingsTab;window.buySkin=buySkin;window.selectSkin=selectSkin;window.buyUpgrade=buyUpgrade;
 window.setControlMode=setControlMode;window.setHanded=setHanded;window.setControlValue=setControlValue;window.buyArena=buyArena;window.selectArena=selectArena;window.buyFood=buyFood;window.selectFood=selectFood;window.buyEmote=buyEmote;window.selectEmote=selectEmote;window.toggleSound=toggleSound;
 window.openDaily=openDaily;window.claimDaily=claimDaily;window.openMissions=openMissions;window.claimMission=claimMission;window.closeModal=closeModal;window.startMatch=startMatch;window.resumeGame=resumeGame;window.quitToLobby=quitToLobby;
+window.handleAndroidBack=function(){
+ if($('dailyModal').classList.contains('show')){closeModal('dailyModal');return true}
+ if($('missionModal').classList.contains('show')){closeModal('missionModal');return true}
+ if($('postModal').classList.contains('show')){closeModal('postModal');showScreen('lobby');return true}
+ if($('gameScreen').classList.contains('active')&&started){
+  if(paused){resumeGame()}else{setPaused(true)}
+  return true;
+ }
+ if(!$('lobby').classList.contains('active')){showScreen('lobby');return true}
+ return false;
+};
 })();
 </script>
 </body>
