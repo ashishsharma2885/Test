@@ -1,4 +1,4 @@
-name: Build Snake Arena v2 APK
+name: Build Snake Arena Thumbnail APK
 
 on:
   push:
@@ -81,8 +81,8 @@ jobs:
                   applicationId 'com.snakearena.game'
                   minSdk 24
                   targetSdk 35
-                  versionCode 2
-                  versionName '2.0.0'
+                  versionCode 3
+                  versionName '2.1.0'
               }
 
               buildTypes {
@@ -148,21 +148,26 @@ jobs:
               android:height="108dp"
               android:viewportWidth="108"
               android:viewportHeight="108">
-              <path
-                  android:fillColor="#54E7FF"
-                  android:pathData="M79,28 C68,17 48,17 35,27 C23,37 24,53 36,61 C45,67 59,64 66,70 C72,75 67,85 56,87 C45,89 36,83 32,74 L22,80 C28,96 47,103 63,98 C80,93 90,80 86,66 C82,53 70,49 58,49 C48,49 41,48 39,43 C36,37 43,30 51,28 C59,26 67,30 72,35 Z"/>
-              <path
-                  android:fillColor="#FFFFFF"
-                  android:pathData="M70,29 m-4,0 a4,4 0,1 0,8 0 a4,4 0,1 0,-8,0"/>
-              <path
-                  android:fillColor="#0A1823"
-                  android:pathData="M71,29 m-1.6,0 a1.6,1.6 0,1 0,3.2 0 a1.6,1.6 0,1 0,-3.2,0"/>
-              <path
-                  android:fillColor="#FFD35A"
-                  android:pathData="M25,29 m-8,0 a8,8 0,1 0,16 0 a8,8 0,1 0,-16,0"/>
-              <path
-                  android:fillColor="#73F0A9"
-                  android:pathData="M26,20 C28,15 33,14 36,15 C33,20 30,22 26,22 Z"/>
+              <!-- bright fruit -->
+              <path android:fillColor="#FFD54A"
+                  android:pathData="M27,31 m-10,0 a10,10 0,1 0,20 0 a10,10 0,1 0,-20,0"/>
+              <path android:fillColor="#70F0A5"
+                  android:pathData="M28,20 C31,14 38,13 42,16 C38,21 34,24 29,24 Z"/>
+              <!-- snake body -->
+              <path android:fillColor="#54E7FF"
+                  android:pathData="M82,28 C69,14 47,16 35,28 C25,38 27,53 39,60 C49,66 62,63 68,70 C74,77 65,87 54,87 C43,87 35,81 31,73 L20,79 C27,96 46,103 63,98 C80,93 91,80 87,66 C83,52 70,48 58,48 C48,48 42,47 40,42 C38,36 44,30 52,28 C61,25 69,29 74,35 Z"/>
+              <!-- snake head highlight -->
+              <path android:fillColor="#8BF4FF"
+                  android:pathData="M74,24 C80,27 84,32 85,38 C81,34 77,32 72,31 Z"/>
+              <!-- eye -->
+              <path android:fillColor="#FFFFFF"
+                  android:pathData="M72,29 m-4,0 a4,4 0,1 0,8 0 a4,4 0,1 0,-8,0"/>
+              <path android:fillColor="#07131C"
+                  android:pathData="M73,29 m-1.6,0 a1.6,1.6 0,1 0,3.2 0 a1.6,1.6 0,1 0,-3.2,0"/>
+              <!-- tongue -->
+              <path android:strokeColor="#FF6B7A" android:strokeWidth="2.4"
+                  android:strokeLineCap="round" android:fillColor="@android:color/transparent"
+                  android:pathData="M84,38 L94,38 M94,38 L99,34 M94,38 L99,42"/>
           </vector>
           EOF
 
@@ -173,10 +178,11 @@ jobs:
               android:viewportWidth="108"
               android:viewportHeight="108">
               <path android:fillColor="#061827" android:pathData="M0,0h108v108h-108z"/>
-              <path android:fillColor="#12324A" android:pathData="M8,8h92v92h-92z"/>
-              <path android:fillColor="#54E7FF" android:pathData="M79,28 C68,17 48,17 35,27 C23,37 24,53 36,61 C45,67 59,64 66,70 C72,75 67,85 56,87 C45,89 36,83 32,74 L22,80 C28,96 47,103 63,98 C80,93 90,80 86,66 C82,53 70,49 58,49 C48,49 41,48 39,43 C36,37 43,30 51,28 C59,26 67,30 72,35 Z"/>
-              <path android:fillColor="#FFFFFF" android:pathData="M70,29 m-4,0 a4,4 0,1 0,8 0 a4,4 0,1 0,-8,0"/>
-              <path android:fillColor="#FFD35A" android:pathData="M25,29 m-8,0 a8,8 0,1 0,16 0 a8,8 0,1 0,-16,0"/>
+              <path android:fillColor="#12344C" android:pathData="M7,7h94v94h-94z"/>
+              <path android:fillColor="#FFD54A" android:pathData="M27,31 m-10,0 a10,10 0,1 0,20 0 a10,10 0,1 0,-20,0"/>
+              <path android:fillColor="#70F0A5" android:pathData="M28,20 C31,14 38,13 42,16 C38,21 34,24 29,24 Z"/>
+              <path android:fillColor="#54E7FF" android:pathData="M82,28 C69,14 47,16 35,28 C25,38 27,53 39,60 C49,66 62,63 68,70 C74,77 65,87 54,87 C43,87 35,81 31,73 L20,79 C27,96 46,103 63,98 C80,93 91,80 87,66 C83,52 70,48 58,48 C48,48 42,47 40,42 C38,36 44,30 52,28 C61,25 69,29 74,35 Z"/>
+              <path android:fillColor="#FFFFFF" android:pathData="M72,29 m-4,0 a4,4 0,1 0,8 0 a4,4 0,1 0,-8,0"/>
           </vector>
           EOF
 
@@ -966,11 +972,11 @@ jobs:
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v2.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-thumbnail.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Snake-Arena-IO-v2-APK
+          name: Snake-Arena-IO-Thumbnail-APK
           path: Snake-Arena-IO-v2.apk
           if-no-files-found: error
