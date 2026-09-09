@@ -128,6 +128,11 @@ input[type=range]{width:100%}
 #emoteBtn{position:absolute;right:118px;bottom:30px;width:58px;height:58px;border-radius:50%;background:rgba(20,60,100,.78);border:2px solid rgba(255,255,255,.28);display:flex;align-items:center;justify-content:center;font-size:28px;pointer-events:auto}
 #energy{position:absolute;left:50%;bottom:15px;transform:translateX(-50%);width:34vw;max-width:330px;height:9px;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden;border:1px solid rgba(255,255,255,.08)}
 #bar{height:100%;width:100%;background:linear-gradient(90deg,#71f3ae,#55e9ff)}
+#gameTopActions{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:9px;pointer-events:auto;z-index:12}
+.gameActionBtn{height:40px;min-width:104px;padding:0 14px;border-radius:12px;border:2px solid rgba(255,255,255,.26);font-size:12px;font-weight:1000;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.35),0 8px 18px rgba(0,0,0,.22)}
+.gameResetBtn{background:linear-gradient(#ffbe47,#e98508)}
+.gameMenuBtn{background:linear-gradient(#4ba8f4,#2769b0)}
+.gameActionBtn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
 #coinPop{position:absolute;right:18px;top:78px;font-weight:1000;color:#ffe45c;font-size:18px;opacity:0;transform:translateY(10px);transition:.22s}
 #pauseOverlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.7);pointer-events:auto}
 #pauseOverlay.show{display:flex}
@@ -151,6 +156,7 @@ input[type=range]{width:100%}
   .lobbyHUD{grid-template-columns:170px 1fr 170px;grid-template-rows:75px 1fr 78px}.logoText{font-size:32px}.snakePreview{height:92px}.navBtn{height:54px;width:110px}
   .difficultySelect{margin:2px 0 4px;padding:4px}.diffBtn{min-width:74px;padding:6px 9px;font-size:12px}.diffHint{font-size:9px;min-height:11px}
   #joystick{width:98px;height:98px;left:14px;bottom:14px}#stick{width:44px;height:44px}#radarWrap{left:12px;bottom:120px}#radar{width:74px;height:74px}
+  #gameTopActions{top:7px;gap:6px}.gameActionBtn{height:34px;min-width:88px;padding:0 10px;font-size:10px}
   #boostBtn{width:74px;height:74px;right:16px;bottom:16px}#emoteBtn{right:102px;bottom:24px;width:50px;height:50px;font-size:24px}
 }
 </style>
@@ -251,6 +257,10 @@ input[type=range]{width:100%}
   <div id="gameUI">
     <div id="stats" class="hudBox">Score <b id="score">0</b><br>Length <b id="length">12</b><br>Rank <b id="rank">-</b><br>Coins <b id="runCoins">0</b><br>Mode <b id="gameDifficulty">MEDIUM</b></div>
     <div id="leader" class="hudBox"><b>LEADERBOARD</b><ol id="leaderList"></ol></div>
+    <div id="gameTopActions">
+      <button class="gameActionBtn gameResetBtn" onclick="restartMatch()">↻ RESET</button>
+      <button class="gameActionBtn gameMenuBtn" onclick="quitToLobby()">⌂ MAIN MENU</button>
+    </div>
     <div id="radarWrap" class="hudBox"><canvas id="radar" width="120" height="120"></canvas></div>
     <div id="joystick"><div id="stick"></div></div>
     <div id="energy"><div id="bar"></div></div>
@@ -467,8 +477,16 @@ function currentArena(){return ARENAS.find(function(s){return s.id===data.select
 function currentFoodTheme(){return FOOD_THEMES.find(function(s){return s.id===data.selectedFood})||FOOD_THEMES[0]}
 function currentEmote(){return EMOTES.find(function(s){return s.id===data.selectedEmote})||EMOTES[0]}
 
+function clearMatchOverlays(){
+ ['postModal','dailyModal','missionModal'].forEach(function(id){
+  const el=$(id);if(el)el.classList.remove('show');
+ });
+ const pause=$('pauseOverlay');if(pause)pause.classList.remove('show');
+ const bubble=$('emoteBubble');if(bubble)bubble.style.display='none';
+}
 function showScreen(id){
  applyDisplaySettings();
+ if(id==='lobby')clearMatchOverlays();
  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
  $(id).classList.add('active');
  if(id==='lobby')renderLobby();
@@ -1026,8 +1044,23 @@ function updateHUD(){
 }
 
 function startMatch(){
- resetDailyMissionsIfNeeded();showScreen('gameScreen');started=true;paused=false;boost=false;run={fruits:0,bots:0,coins:0,xp:0,maxLength:12,startLevel:data.level,startXP:data.xp,elapsed:0,missionSurvivalBase:data.missions.survival};runStart=performance.now();lastMinuteReward=0;data.stats.gamesPlayed++;saveData();
- player=initWorld();joystick.lastAngle=player.angle;pointer.lastMove=0;pointer.down=false;$('pauseOverlay').classList.remove('show');$('emoteBtn').textContent=currentEmote().emoji;applyControlLayout();last=performance.now();
+ clearMatchOverlays();
+ boost=false;boostPointerId=null;
+ releaseJoystick();
+ pointer.down=false;pointer.lastMove=0;
+ resetDailyMissionsIfNeeded();
+ showScreen('gameScreen');
+ started=true;paused=false;
+ run={fruits:0,bots:0,coins:0,xp:0,maxLength:12,startLevel:data.level,startXP:data.xp,elapsed:0,missionSurvivalBase:data.missions.survival};
+ runStart=performance.now();lastMinuteReward=0;lastMissionSave=performance.now();
+ data.stats.gamesPlayed++;saveData();
+
+ player=initWorld();
+ joystick.lastAngle=player.angle;
+ $('boostBtn').classList.remove('active');
+ $('emoteBtn').textContent=currentEmote().emoji;
+ applyControlLayout();
+ last=performance.now();
 }
 function finishMatch(){
  if(!run)return;
@@ -1040,11 +1073,30 @@ function finishMatch(){
   ['SCORE',Math.floor(player.score)],['LENGTH',run.maxLength],['SURVIVAL',formatTime(survival)],['FRUITS',run.fruits],['BOTS',run.bots],['COINS','+'+run.coins],['XP','+'+run.xp],['RANK','#'+rank],['MODE',difficultyConfig().label]
  ].map(function(v){return '<div class="postStat card"><small>'+v[0]+'</small><strong>'+v[1]+'</strong></div>'}).join('');
  $('xpSummary').innerHTML='<b class="yellow">LEVEL '+run.startLevel+' → LEVEL '+data.level+'</b><div class="progress" style="margin-top:8px"><div style="width:'+(data.xp/xpNeeded(data.level)*100)+'%"></div></div><div class="muted" style="margin-top:5px">'+data.xp+' / '+xpNeeded(data.level)+' XP</div>';
+ clearMatchOverlays();
  $('postModal').classList.add('show');run=null;renderLobby();
 }
+function saveAbandonedRunProgress(){
+ if(started&&run){
+  const survival=run.elapsed;
+  data.stats.totalPlayTime+=survival;
+  data.missions.survival=Math.max(data.missions.survival,run.missionSurvivalBase+Math.floor(survival));
+  data.missions.maxLength=Math.max(data.missions.maxLength,run.maxLength||12);
+  saveData();
+ }
+}
+function restartMatch(){
+ saveAbandonedRunProgress();
+ started=false;paused=false;run=null;
+ clearMatchOverlays();
+ startMatch();
+}
 function quitToLobby(){
- if(started&&run){const survival=run.elapsed;data.stats.totalPlayTime+=survival;data.missions.survival=Math.max(data.missions.survival,run.missionSurvivalBase+Math.floor(survival));saveData()}
- started=false;paused=false;run=null;$('pauseOverlay').classList.remove('show');showScreen('lobby');
+ saveAbandonedRunProgress();
+ started=false;paused=false;boost=false;boostPointerId=null;run=null;
+ releaseJoystick();
+ clearMatchOverlays();
+ showScreen('lobby');
 }
 function setPaused(v){
  if(!started)return;paused=v;
@@ -1115,7 +1167,7 @@ $('emoteBtn').addEventListener('pointerdown',function(e){$('emoteBubble').textCo
 applyDisplaySettings();refreshWallet();resetDailyMissionsIfNeeded();renderLobby();
 window.showScreen=showScreen;window.setDifficulty=setDifficulty;window.setWardrobeTab=setWardrobeTab;window.setSettingsTab=setSettingsTab;window.buySkin=buySkin;window.selectSkin=selectSkin;window.buyUpgrade=buyUpgrade;
 window.setControlMode=setControlMode;window.setHanded=setHanded;window.setControlValue=setControlValue;window.resetJoystickPosition=resetJoystickPosition;window.setDisplayValue=setDisplayValue;window.autoFitDisplay=autoFitDisplay;window.resetDisplay=resetDisplay;window.buyArena=buyArena;window.selectArena=selectArena;window.buyFood=buyFood;window.selectFood=selectFood;window.buyEmote=buyEmote;window.selectEmote=selectEmote;window.toggleSound=toggleSound;
-window.openDaily=openDaily;window.claimDaily=claimDaily;window.openMissions=openMissions;window.claimMission=claimMission;window.closeModal=closeModal;window.startMatch=startMatch;window.resumeGame=resumeGame;window.quitToLobby=quitToLobby;
+window.openDaily=openDaily;window.claimDaily=claimDaily;window.openMissions=openMissions;window.claimMission=claimMission;window.closeModal=closeModal;window.startMatch=startMatch;window.restartMatch=restartMatch;window.resumeGame=resumeGame;window.quitToLobby=quitToLobby;
 window.handleAndroidBack=function(){
  if($('dailyModal').classList.contains('show')){closeModal('dailyModal');return true}
  if($('missionModal').classList.contains('show')){closeModal('missionModal');return true}
