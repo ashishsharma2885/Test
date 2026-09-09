@@ -189,7 +189,7 @@ input[type=range]{width:100%}
       </div>
       <div id="difficultyHint" class="diffHint"></div>
       <button class="primary playBtn" onclick="startMatch()">PLAY</button>
-      <div class="muted" style="margin-top:10px;font-weight:800">Endless arena · 50 AI rivals · bots fight each other · offline</div>
+      <div class="muted" style="margin-top:10px;font-weight:800">Start small · grow gradually by eating · 50 AI rivals · bots fight each other · offline</div>
     </div>
 
     <div class="quickRight">
@@ -255,7 +255,7 @@ input[type=range]{width:100%}
 <section id="gameScreen" class="screen">
   <canvas id="game"></canvas>
   <div id="gameUI">
-    <div id="stats" class="hudBox">Score <b id="score">0</b><br>Length <b id="length">12</b><br>Rank <b id="rank">-</b><br>Coins <b id="runCoins">0</b><br>Mode <b id="gameDifficulty">MEDIUM</b></div>
+    <div id="stats" class="hudBox">Score <b id="score">0</b><br>Length <b id="length">8</b><br>Rank <b id="rank">-</b><br>Coins <b id="runCoins">0</b><br>Mode <b id="gameDifficulty">MEDIUM</b></div>
     <div id="leader" class="hudBox"><b>LEADERBOARD</b><ol id="leaderList"></ol></div>
     <div id="gameTopActions">
       <button class="gameActionBtn gameResetBtn" onclick="restartMatch()">↻ RESET</button>
@@ -736,7 +736,7 @@ function resize(){
 }
 addEventListener('resize',resize);resize();
 
-const WORLD=7600,FOOD_TARGET=1350,MAX_FOOD=2300,BOTS=50,BASE_SPEED=146,BOOST_SPEED=236,MIN_LENGTH=10;
+const WORLD=7600,FOOD_TARGET=1350,MAX_FOOD=2300,BOTS=50,BASE_SPEED=146,BOOST_SPEED=236,MIN_LENGTH=7,PLAYER_START_LENGTH=8;
 const FOOD_CELL=190,BODY_CELL=170,FOOD_CELLS=Math.ceil(WORLD/FOOD_CELL),BODY_CELLS=Math.ceil(WORLD/BODY_CELL);
 const BOT_COLORS=['#ff6b6b','#7bdff2','#8aff80','#ff9f43','#c56cf0','#54a0ff','#00d2d3','#feca57','#74b9ff','#fd79a8'];
 const BOT_NAMES=['Nova','Viper','Rex','Comet','Blaze','Echo','Bolt','Luna','Dash','Venom','Titan','Skye','Astro','Cobra','Ghost','Turbo','Spark','Neon','Hunter','Raptor','Flash','Cosmo','Matrix','Volt','Drift','Hydra','Orbit','Frost','Rocket','Pulse'];
@@ -788,19 +788,37 @@ class Snake{
   };this.score=0;this.respawn(true);
  }
  respawn(first){
-  const p=safeSpawn();this.x=p.x;this.y=p.y;this.angle=rand(-Math.PI,Math.PI);this.alive=true;this.length=this.isPlayer?12:rand(16,30);this.energy=1;this.speed=BASE_SPEED;this.history=[];this.segments=[];this.ai.target=null;this.ai.timer=0;this.ai.targetAge=0;this.ai.stuckTime=0;this.ai.moveCheck=0;this.ai.lastX=this.x;this.ai.lastY=this.y;this.ai.roamAngle=this.angle+rand(-1.2,1.2);this.ai.boosting=false;this.ai.boostTimer=0;
-  for(let i=0;i<150;i++)this.history.push({x:this.x,y:this.y});this.syncSegments();if(!first&&!this.isPlayer)this.score=0;
+  const p=safeSpawn();this.x=p.x;this.y=p.y;this.angle=rand(-Math.PI,Math.PI);this.alive=true;this.length=this.isPlayer?PLAYER_START_LENGTH:rand(14,26);this.energy=1;this.speed=BASE_SPEED;this.history=[];this.segments=[];this.ai.target=null;this.ai.timer=0;this.ai.targetAge=0;this.ai.stuckTime=0;this.ai.moveCheck=0;this.ai.lastX=this.x;this.ai.lastY=this.y;this.ai.roamAngle=this.angle+rand(-1.2,1.2);this.ai.boosting=false;this.ai.boostTimer=0;
+  for(let i=0;i<150;i++)this.history.push({x:this.x,y:this.y});this.updateBodySize();this.syncSegments();if(!first&&!this.isPlayer)this.score=0;
  }
  syncSegments(){
   const visualCap=900,wanted=Math.min(visualCap,Math.floor(this.length));
   while(this.segments.length<wanted)this.segments.push({x:this.x,y:this.y});
   if(this.segments.length>wanted)this.segments.length=wanted;
  }
- grow(value){this.length+=value*1.8*(1+(data.upgrades.food-1)*.05);this.score+=Math.round(value*12);this.syncSegments()}
+ updateBodySize(){
+  if(this.isPlayer){
+   const extra=Math.sqrt(Math.max(0,this.length-PLAYER_START_LENGTH))*.42;
+   this.radius=clamp(7.6+extra,7.6,11.2);
+  }else{
+   this.radius=clamp(9.2+Math.sqrt(Math.max(0,this.length-14))*.18,9.2,10.8);
+  }
+ }
+ grow(value){
+  // Early game grows slowly; larger snakes gradually gain more length per fruit.
+  const stage=this.length<20?.56:this.length<45?.70:this.length<100?.84:1;
+  const upgrade=1+(data.upgrades.food-1)*.03;
+  const base=this.isPlayer?value*.95*stage*upgrade:value*.82;
+  const growth=Math.max(this.isPlayer?.38:.30,base);
+  this.length+=growth;
+  this.score+=Math.round(value*12);
+  this.updateBodySize();
+  this.syncSegments();
+ }
  die(killer){
   if(!this.alive)return;this.alive=false;
   const maxDrops=90,step=Math.max(2,Math.ceil(this.segments.length/maxDrops));
-  for(let i=1;i<this.segments.length;i+=step){const p=this.segments[i];spawnFood(p.x+rand(-9,9),p.y+rand(-9,9),2.1,true)}
+  for(let i=1;i<this.segments.length;i+=step){const p=this.segments[i];spawnFood(p.x+rand(-9,9),p.y+rand(-9,9),1.55,true)}
   if(this.isPlayer){finishMatch()}
   else{
    if(killer&&killer.isPlayer)awardBotKill();
@@ -1051,7 +1069,7 @@ function startMatch(){
  resetDailyMissionsIfNeeded();
  showScreen('gameScreen');
  started=true;paused=false;
- run={fruits:0,bots:0,coins:0,xp:0,maxLength:12,startLevel:data.level,startXP:data.xp,elapsed:0,missionSurvivalBase:data.missions.survival};
+ run={fruits:0,bots:0,coins:0,xp:0,maxLength:PLAYER_START_LENGTH,startLevel:data.level,startXP:data.xp,elapsed:0,missionSurvivalBase:data.missions.survival};
  runStart=performance.now();lastMinuteReward=0;lastMissionSave=performance.now();
  data.stats.gamesPlayed++;saveData();
 
@@ -1081,7 +1099,7 @@ function saveAbandonedRunProgress(){
   const survival=run.elapsed;
   data.stats.totalPlayTime+=survival;
   data.missions.survival=Math.max(data.missions.survival,run.missionSurvivalBase+Math.floor(survival));
-  data.missions.maxLength=Math.max(data.missions.maxLength,run.maxLength||12);
+  data.missions.maxLength=Math.max(data.missions.maxLength,run.maxLength||PLAYER_START_LENGTH);
   saveData();
  }
 }
