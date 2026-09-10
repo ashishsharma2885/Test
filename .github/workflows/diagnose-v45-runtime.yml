@@ -23,7 +23,7 @@ jobs:
       - name: Run game runtime smoke test
         shell: bash
         run: |
-          cat > /tmp/smoke.cjs <<'EOF'
+          cat > smoke.cjs <<'EOF'
           const fs=require('fs');
           const {JSDOM,VirtualConsole}=require('jsdom');
           const html=fs.readFileSync('/tmp/game-multiplayer.html','utf8');
@@ -50,26 +50,26 @@ jobs:
           w.addEventListener('unhandledrejection',e=>errors.push('rejection: '+String(e.reason)));
           const sleep=ms=>new Promise(r=>setTimeout(r,ms));
           (async()=>{
-            await sleep(250);
+            await sleep(300);
             if(errors.length) throw new Error(errors.join('\n'));
             const play=w.document.querySelector('.playBtn'); if(!play) throw new Error('PLAY button missing');
-            play.click(); await sleep(300);
+            play.click(); await sleep(350);
             if(!w.document.querySelector('#gameScreen.active')) throw new Error('Game screen did not open');
             const canvas=w.document.querySelector('#game');
             canvas.dispatchEvent(new w.PointerEvent('pointerdown',{clientX:120,clientY:300,bubbles:true,pointerId:7}));
-            await sleep(50);
+            await sleep(60);
             const joy=w.document.querySelector('#joystick');
             if(!joy || joy.style.display==='none') throw new Error('Floating joystick did not appear');
             canvas.dispatchEvent(new w.PointerEvent('pointermove',{clientX:155,clientY:280,bubbles:true,pointerId:7}));
             canvas.dispatchEvent(new w.PointerEvent('pointerup',{clientX:155,clientY:280,bubbles:true,pointerId:7}));
-            await sleep(80);
-            w.restartMatch(); await sleep(300);
+            await sleep(100);
+            w.restartMatch(); await sleep(350);
             if(!w.document.querySelector('#gameScreen.active')) throw new Error('Restart failed');
-            w.quitToLobby(); await sleep(400);
+            w.quitToLobby(); await sleep(450);
             if(!w.document.querySelector('#lobby.active')) throw new Error('Return to lobby failed');
             if(errors.length) throw new Error(errors.join('\n'));
             console.log('RUNTIME_SMOKE_OK');
             w.close();
           })().catch(e=>{console.error(e.stack||e);process.exitCode=1;w.close()});
           EOF
-          node /tmp/smoke.cjs
+          node smoke.cjs
