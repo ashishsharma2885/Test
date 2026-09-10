@@ -1,0 +1,92 @@
+name: Build Snake Arena Multiplayer Loot Fix APK
+
+on:
+  push:
+    branches:
+      - snake-arena-apk-build
+    paths:
+      - 'snake-arena-v3/apply_multiplayer_loot_fix.py'
+      - '.github/workflows/build-snake-arena-v4.3-loot.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Apply multiplayer room and death loot patches
+        run: |
+          python3 snake-arena-v3/apply_multiplayer_patch.py
+          python3 snake-arena-v3/apply_multiplayer_loot_fix.py
+
+      - name: Reuse Android project generator
+        shell: bash
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import subprocess, yaml
+          from pathlib import Path
+          wf=yaml.safe_load(Path('.github/workflows/build-snake-arena-v4-multiplayer.yml').read_text())
+          steps=wf['jobs']['build']['steps']
+          block=next(s['run'] for s in steps if s.get('name')=='Create Android project')
+          subprocess.run(block, shell=True, executable='/bin/bash', check=True)
+          PY
+          sed -i "s/versionCode 17/versionCode 18/" app/build.gradle
+          sed -i "s/versionName '4.2.0'/versionName '4.3.0'/" app/build.gradle
+
+      - name: Validate JavaScript and death loot sync
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('app/src/main/assets/game.html').read_text()
+          scripts=re.findall(r'<script>([\s\S]*?)</script>',html)
+          if not scripts: raise SystemExit('No game script found')
+          Path('/tmp/snake-game.js').write_text('\n'.join(scripts))
+          required=[
+            'function spawnRoomDeathLoot(victim)',
+            'function handleRoomDeathLoot(packet)',
+            "t:'death_loot'",
+            "if(packet.t==='death_loot')",
+            'spawnFood(x,y,v,true)',
+            'ROOM_MAX_PLAYERS=4',
+            'PLAYER_START_LENGTH=3'
+          ]
+          missing=[x for x in required if x not in html]
+          if missing: raise SystemExit('Death loot validation failed: '+', '.join(missing))
+          print('Multiplayer death loot structure validated')
+          PY
+          node --check /tmp/snake-game.js
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Package and verify APK
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v4.3-death-loot-fix.apk
+          unzip -t Snake-Arena-IO-v4.3-death-loot-fix.apk >/dev/null
+          test -s Snake-Arena-IO-v4.3-death-loot-fix.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snake-Arena-IO-v4.3-Death-Loot-Fix-APK
+          path: Snake-Arena-IO-v4.3-death-loot-fix.apk
+          if-no-files-found: error
