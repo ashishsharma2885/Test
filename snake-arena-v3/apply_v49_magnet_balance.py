@@ -59,7 +59,7 @@ end = html.find('};', start)
 if end < 0:
     raise SystemExit('v4.9 helper end missing')
 end += 2
-helper = "window.__v48FoodPickupTest=function(){if(!player)return false;const oldLv=data.upgrades.magnet,r=5;base=player.radius+r+3;function mk(dist){return{x:wrap(player.x+dist),y:player.y,v:.7,r:r,loot:false,golden:false,alive:true,ttl:1e9,phase:0,emoji:'x'}}data.upgrades.magnet=1;let near=mk(base-.5),far=mk(base+12);foods=[near,far];rebuildFoodGrid();player.eatNearby();const baseOk=!near.alive&&far.alive;data.upgrades.magnet=4;let upgraded=mk(base+12);foods=[upgraded];rebuildFoodGrid();player.eatNearby();const upgradeOk=!upgraded.alive;data.upgrades.magnet=oldLv;return baseOk&&upgradeOk};"
+helper = "window.__v48FoodPickupTest=function(){if(!player)return false;const oldLv=data.upgrades.magnet,r=5,base=player.radius+r+3;function mk(dist){return{x:wrap(player.x+dist),y:player.y,v:.7,r:r,loot:false,golden:false,alive:true,ttl:1e9,phase:0,emoji:'x'}}data.upgrades.magnet=1;let near=mk(base-.5),far=mk(base+12);foods=[near,far];rebuildFoodGrid();player.eatNearby();const baseOk=!near.alive&&far.alive;data.upgrades.magnet=4;let upgraded=mk(base+12);foods=[upgraded];rebuildFoodGrid();player.eatNearby();const upgradeOk=!upgraded.alive;data.upgrades.magnet=oldLv;return baseOk&&upgradeOk};"
 html = html[:start] + helper + html[end:]
 
 required = [
