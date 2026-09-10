@@ -49,5 +49,13 @@ if transport_line not in s:
     raise SystemExit('Could not find transportLabel helper')
 s=s.replace(transport_line,transport_with_helper,1)
 
+# Expose existing room lifecycle helpers so the automated runtime smoke test can drive the
+# same code paths that real peer packets use. This does not alter gameplay behavior.
+export_line="window.openLocalMultiplayer=openLocalMultiplayer;window.openMultiplayer=openLocalMultiplayer;window.joinOnlineRoom=joinOnlineRoom;window.closeMultiplayerModal=closeMultiplayerModal;"
+export_test=export_line+"window.handleJoinRequest=handleJoinRequest;window.handleRoomState=handleRoomState;window.localProfile=localProfile;"
+if export_line not in s:
+    raise SystemExit('Could not find online export replacement')
+s=s.replace(export_line,export_test,1)
+
 p.write_text(s,encoding='utf-8')
 print('v4.7 patch driver repaired')
