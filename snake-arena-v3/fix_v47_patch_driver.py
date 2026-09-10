@@ -33,5 +33,9 @@ if needle not in s:
     raise SystemExit('Could not find export marker for room full fix')
 s=s.replace(needle,insert+needle,1)
 
+# renderMpHome is itself JavaScript source building HTML strings, so the onclick quotes
+# are escaped in the generated source. Validate the actual representation instead.
+s=s.replace('    "selectMultiplayerTransport(\'online\')",', '    "selectMultiplayerTransport(\\\'online\\\')",', 1)
+
 p.write_text(s,encoding='utf-8')
 print('v4.7 patch driver repaired')
