@@ -1,0 +1,75 @@
+name: Diagnose Snake Arena v4.5 Runtime
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [snake-arena-apk-build]
+    paths:
+      - '.github/workflows/diagnose-v45-runtime.yml'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate current v4.5 HTML
+        run: |
+          python3 snake-arena-v3/apply_multiplayer_patch.py
+          python3 snake-arena-v3/apply_multiplayer_loot_fix.py
+          python3 snake-arena-v3/apply_v44_smooth_patch.py
+          python3 snake-arena-v3/apply_v45_controls_world_patch.py
+      - name: Install runtime test DOM
+        run: npm install --no-save jsdom@24
+      - name: Run game runtime smoke test
+        shell: bash
+        run: |
+          cat > /tmp/smoke.cjs <<'EOF'
+          const fs=require('fs');
+          const {JSDOM,VirtualConsole}=require('jsdom');
+          const html=fs.readFileSync('/tmp/game-multiplayer.html','utf8');
+          const errors=[];
+          const vc=new VirtualConsole();
+          vc.on('jsdomError',e=>errors.push('jsdomError: '+e.message));
+          vc.on('error',(...a)=>errors.push('console.error: '+a.join(' ')));
+          const noop=()=>{};
+          const gradient={addColorStop:noop};
+          const ctx=new Proxy({canvas:{width:1280,height:720},measureText:t=>({width:String(t).length*7}),createLinearGradient:()=>gradient,createRadialGradient:()=>gradient,createPattern:()=>null,getImageData:()=>({data:new Uint8ClampedArray(4)}),save:noop,restore:noop,beginPath:noop,closePath:noop,moveTo:noop,lineTo:noop,arc:noop,rect:noop,clip:noop,stroke:noop,fill:noop,fillRect:noop,clearRect:noop,drawImage:noop,fillText:noop,setTransform:noop,translate:noop,rotate:noop,scale:noop}, {get:(o,p)=>p in o?o[p]:noop,set:(o,p,v)=>(o[p]=v,true)});
+          const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://local.snake/',virtualConsole:vc,beforeParse(w){
+            Object.defineProperty(w,'innerWidth',{value:900,writable:true});
+            Object.defineProperty(w,'innerHeight',{value:420,writable:true});
+            Object.defineProperty(w,'devicePixelRatio',{value:1,writable:true});
+            w.HTMLCanvasElement.prototype.getContext=function(){return ctx};
+            w.HTMLCanvasElement.prototype.setPointerCapture=noop;
+            w.HTMLCanvasElement.prototype.releasePointerCapture=noop;
+            w.HTMLElement.prototype.setPointerCapture=noop;
+            w.HTMLElement.prototype.releasePointerCapture=noop;
+            if(!w.PointerEvent) w.PointerEvent=w.MouseEvent;
+          }});
+          const w=dom.window;
+          w.addEventListener('error',e=>errors.push('window.error: '+(e.error?.stack||e.message)));
+          w.addEventListener('unhandledrejection',e=>errors.push('rejection: '+String(e.reason)));
+          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          (async()=>{
+            await sleep(250);
+            if(errors.length) throw new Error(errors.join('\n'));
+            const play=w.document.querySelector('.playBtn'); if(!play) throw new Error('PLAY button missing');
+            play.click(); await sleep(300);
+            if(!w.document.querySelector('#gameScreen.active')) throw new Error('Game screen did not open');
+            const canvas=w.document.querySelector('#game');
+            canvas.dispatchEvent(new w.PointerEvent('pointerdown',{clientX:120,clientY:300,bubbles:true,pointerId:7}));
+            await sleep(50);
+            const joy=w.document.querySelector('#joystick');
+            if(!joy || joy.style.display==='none') throw new Error('Floating joystick did not appear');
+            canvas.dispatchEvent(new w.PointerEvent('pointermove',{clientX:155,clientY:280,bubbles:true,pointerId:7}));
+            canvas.dispatchEvent(new w.PointerEvent('pointerup',{clientX:155,clientY:280,bubbles:true,pointerId:7}));
+            await sleep(80);
+            w.restartMatch(); await sleep(300);
+            if(!w.document.querySelector('#gameScreen.active')) throw new Error('Restart failed');
+            w.quitToLobby(); await sleep(400);
+            if(!w.document.querySelector('#lobby.active')) throw new Error('Return to lobby failed');
+            if(errors.length) throw new Error(errors.join('\n'));
+            console.log('RUNTIME_SMOKE_OK');
+            w.close();
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1;w.close()});
+          EOF
+          node /tmp/smoke.cjs
