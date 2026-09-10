@@ -1,0 +1,411 @@
+name: Build Snake Arena Local Multiplayer APK
+
+on:
+  push:
+    branches:
+      - snake-arena-apk-build
+    paths:
+      - 'snake-arena-v3/game.html'
+      - 'snake-arena-v3/LocalNetworkBridge.java'
+      - 'snake-arena-v3/apply_multiplayer_patch.py'
+      - '.github/workflows/build-snake-arena-v4-multiplayer.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Apply multiplayer patch
+        run: python3 snake-arena-v3/apply_multiplayer_patch.py
+
+      - name: Create Android project
+        shell: bash
+        run: |
+          mkdir -p app/src/main/java/com/snakearena/game
+          mkdir -p app/src/main/assets
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-anydpi
+          mkdir -p app/src/main/res/mipmap-anydpi-v26
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = 'SnakeArenaLocalMultiplayer'
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=false
+          android.nonTransitiveRClass=true
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.snakearena.game'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId 'com.snakearena.game'
+                  minSdk 24
+                  targetSdk 35
+                  versionCode 16
+                  versionName '4.0.0'
+              }
+
+              buildTypes {
+                  debug { minifyEnabled false }
+                  release { minifyEnabled false }
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+              <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+              <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+              <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
+              <application
+                  android:allowBackup="true"
+                  android:hardwareAccelerated="true"
+                  android:usesCleartextTraffic="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher_round"
+                  android:label="Snake Arena IO"
+                  android:supportsRtl="true"
+                  android:theme="@style/AppTheme">
+                  <activity
+                      android:name=".MainActivity"
+                      android:configChanges="keyboardHidden|orientation|screenSize"
+                      android:exported="true"
+                      android:screenOrientation="sensorLandscape">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowFullscreen">true</item>
+                  <item name="android:windowActionModeOverlay">true</item>
+                  <item name="android:navigationBarColor">#04101B</item>
+                  <item name="android:statusBarColor">#04101B</item>
+                  <item name="android:windowLightStatusBar">false</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/values/colors.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources><color name="icon_bg">#061827</color></resources>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#FFD54A" android:pathData="M27,31 m-10,0 a10,10 0,1 0,20 0 a10,10 0,1 0,-20,0"/>
+              <path android:fillColor="#70F0A5" android:pathData="M28,20 C31,14 38,13 42,16 C38,21 34,24 29,24 Z"/>
+              <path android:fillColor="#54E7FF" android:pathData="M82,28 C69,14 47,16 35,28 C25,38 27,53 39,60 C49,66 62,63 68,70 C74,77 65,87 54,87 C43,87 35,81 31,73 L20,79 C27,96 46,103 63,98 C80,93 91,80 87,66 C83,52 70,48 58,48 C48,48 42,47 40,42 C38,36 44,30 52,28 C61,25 69,29 74,35 Z"/>
+              <path android:fillColor="#FFFFFF" android:pathData="M72,29 m-4,0 a4,4 0,1 0,8 0 a4,4 0,1 0,-8,0"/>
+              <path android:fillColor="#07131C" android:pathData="M73,29 m-1.6,0 a1.6,1.6 0,1 0,3.2 0 a1.6,1.6 0,1 0,-3.2,0"/>
+          </vector>
+          EOF
+
+          cat > app/src/main/res/mipmap-anydpi/ic_launcher.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="48dp" android:height="48dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#061827" android:pathData="M0,0h108v108h-108z"/>
+              <path android:fillColor="#54E7FF" android:pathData="M82,28 C69,14 47,16 35,28 C25,38 27,53 39,60 C49,66 62,63 68,70 C74,77 65,87 54,87 C43,87 35,81 31,73 L20,79 C27,96 46,103 63,98 C80,93 91,80 87,66 C83,52 70,48 58,48 C48,48 42,47 40,42 C38,36 44,30 52,28 C61,25 69,29 74,35 Z"/>
+              <path android:fillColor="#FFD54A" android:pathData="M27,31 m-9,0 a9,9 0,1 0,18 0 a9,9 0,1 0,-18,0"/>
+          </vector>
+          EOF
+          cp app/src/main/res/mipmap-anydpi/ic_launcher.xml app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
+
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'EOF'
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/icon_bg"/>
+              <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+          </adaptive-icon>
+          EOF
+          cp app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+
+          cp snake-arena-v3/LocalNetworkBridge.java app/src/main/java/com/snakearena/game/LocalNetworkBridge.java
+          cp /tmp/game-multiplayer.html app/src/main/assets/game.html
+
+          cat > app/src/main/java/com/snakearena/game/MainActivity.java <<'EOF'
+          package com.snakearena.game;
+
+          import android.annotation.SuppressLint;
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.Window;
+          import android.view.WindowManager;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+              private LocalNetworkBridge localNet;
+              private ValueCallback<Uri[]> filePathCallback;
+              private static final int FILE_CHOOSER_REQUEST = 1001;
+
+              @Override
+              @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  requestWindowFeature(Window.FEATURE_NO_TITLE);
+                  getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  immersive();
+
+                  webView = new WebView(this);
+                  setContentView(webView);
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setAllowFileAccess(true);
+                  settings.setBuiltInZoomControls(false);
+                  settings.setDisplayZoomControls(false);
+                  settings.setSupportZoom(false);
+                  settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+
+                  webView.setBackgroundColor(0xFF04101B);
+                  webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                  webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+                  webView.setVerticalScrollBarEnabled(false);
+                  webView.setHorizontalScrollBarEnabled(false);
+                  webView.setLongClickable(false);
+                  webView.setHapticFeedbackEnabled(false);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                          if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+                          filePathCallback = callback;
+                          Intent intent;
+                          try {
+                              intent = params.createIntent();
+                              intent.setType("image/*");
+                          } catch (Exception e) {
+                              intent = new Intent(Intent.ACTION_GET_CONTENT);
+                              intent.addCategory(Intent.CATEGORY_OPENABLE);
+                              intent.setType("image/*");
+                          }
+                          try {
+                              startActivityForResult(Intent.createChooser(intent, "Choose snake texture"), FILE_CHOOSER_REQUEST);
+                          } catch (Exception e) {
+                              if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+                              filePathCallback = null;
+                              return false;
+                          }
+                          return true;
+                      }
+                  });
+
+                  localNet = new LocalNetworkBridge(this, webView);
+                  webView.addJavascriptInterface(localNet, "LocalNet");
+                  webView.loadUrl("file:///android_asset/game.html");
+              }
+
+              private void immersive() {
+                  getWindow().getDecorView().setSystemUiVisibility(
+                      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
+                      View.SYSTEM_UI_FLAG_FULLSCREEN |
+                      View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                      View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+                      View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+                      View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                  );
+              }
+
+              @Override
+              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                  if (requestCode == FILE_CHOOSER_REQUEST) {
+                      Uri[] results = resultCode == Activity.RESULT_OK
+                          ? WebChromeClient.FileChooserParams.parseResult(resultCode, data)
+                          : null;
+                      if (filePathCallback != null) {
+                          filePathCallback.onReceiveValue(results);
+                          filePathCallback = null;
+                      }
+                      immersive();
+                      return;
+                  }
+                  super.onActivityResult(requestCode, resultCode, data);
+              }
+
+              @Override
+              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                  super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+                  if (localNet != null) localNet.onPermissionsResult(requestCode, permissions, grantResults);
+              }
+
+              @Override
+              protected void onPause() {
+                  if (webView != null) {
+                      webView.evaluateJavascript("window.snakeAppPause&&window.snakeAppPause()", null);
+                      webView.onPause();
+                      webView.pauseTimers();
+                  }
+                  super.onPause();
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  if (webView != null) {
+                      webView.resumeTimers();
+                      webView.onResume();
+                      webView.evaluateJavascript("window.snakeAppResume&&window.snakeAppResume()", null);
+                  }
+                  immersive();
+              }
+
+              @Override
+              public void onWindowFocusChanged(boolean hasFocus) {
+                  super.onWindowFocusChanged(hasFocus);
+                  if (hasFocus) immersive();
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView == null) { finish(); return; }
+                  webView.evaluateJavascript(
+                      "(window.handleAndroidBack&&window.handleAndroidBack())?'true':'false'",
+                      value -> { if (!"\"true\"".equals(value) && !"true".equals(value)) finish(); }
+                  );
+              }
+
+              @Override
+              protected void onDestroy() {
+                  if (localNet != null) {
+                      localNet.shutdown();
+                      localNet = null;
+                  }
+                  if (filePathCallback != null) {
+                      filePathCallback.onReceiveValue(null);
+                      filePathCallback = null;
+                  }
+                  if (webView != null) {
+                      webView.removeJavascriptInterface("LocalNet");
+                      webView.loadUrl("about:blank");
+                      webView.destroy();
+                      webView = null;
+                  }
+                  super.onDestroy();
+              }
+          }
+          EOF
+
+      - name: Validate game JavaScript
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('app/src/main/assets/game.html').read_text()
+          scripts=re.findall(r'<script>([\s\S]*?)</script>',html)
+          if not scripts: raise SystemExit('No game script found')
+          Path('/tmp/snake-game.js').write_text('\n'.join(scripts))
+          PY
+          node --check /tmp/snake-game.js
+
+      - name: Validate multiplayer structure
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html=Path('app/src/main/assets/game.html').read_text()
+          java=Path('app/src/main/java/com/snakearena/game/LocalNetworkBridge.java').read_text()
+          required_html=[
+            'Local Multiplayer','hostWifiGame()','joinWifiGame()',
+            'hostBluetoothGame()','joinBluetoothGame()',
+            'function onLocalNetEvent(raw)','function beginLocalRound(packet,role)',
+            'function localMultiplayerCollisionCheck()','function sendLocalState(now,force)',
+            'PLAYER_START_LENGTH=3','GAME_STATE=Object.freeze'
+          ]
+          required_java=['hostWifi()','joinWifi(String host)','hostBluetooth()','joinBluetooth(String address)','@JavascriptInterface','BluetoothSocket','ServerSocket']
+          missing=[x for x in required_html if x not in html]+[x for x in required_java if x not in java]
+          if missing: raise SystemExit('Missing multiplayer pieces: '+', '.join(missing))
+          print('Local multiplayer structure validated')
+          PY
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v4.0-local-multiplayer.apk
+
+      - name: Verify APK
+        run: |
+          unzip -t Snake-Arena-IO-v4.0-local-multiplayer.apk >/dev/null
+          test -s Snake-Arena-IO-v4.0-local-multiplayer.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snake-Arena-IO-v4.0-Local-Multiplayer-APK
+          path: Snake-Arena-IO-v4.0-local-multiplayer.apk
+          if-no-files-found: error
