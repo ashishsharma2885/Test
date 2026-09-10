@@ -1,0 +1,174 @@
+name: Build Snake Arena v4.7 Online Multiplayer Fixed APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [snake-arena-apk-build]
+    paths:
+      - 'snake-arena-v3/fix_v47_patch_driver.py'
+      - '.github/workflows/build-snake-arena-v4.7-online-fixed.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Repair online patch and generate v4.7 game
+        run: |
+          python3 snake-arena-v3/fix_v47_patch_driver.py
+          python3 snake-arena-v3/apply_multiplayer_patch.py
+          python3 snake-arena-v3/apply_multiplayer_loot_fix.py
+          python3 snake-arena-v3/apply_v44_smooth_patch.py
+          python3 snake-arena-v3/apply_v45_controls_world_patch.py
+          python3 snake-arena-v3/apply_v46_android_runtime_fix.py
+          python3 snake-arena-v3/apply_v47_online_multiplayer.py
+
+      - name: Validate JavaScript and online architecture
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('/tmp/game-multiplayer.html').read_text()
+          scripts=re.findall(r'<script(?:\s[^>]*)?>([\s\S]*?)</script>',html)
+          inline=[s for s in scripts if s.strip()]
+          if not inline: raise SystemExit('No inline game script found')
+          js='\n'.join(inline)
+          Path('/tmp/snake-game.js').write_text(js)
+          required=[
+            '<script src="peerjs.min.js"></script>',
+            "const ONLINE_ROOM_PREFIX='snakearena-v47-'",
+            'function startOnlineHostTransport()',
+            'function joinOnlineRoom()',
+            'function sendOnlinePacket(packet,peerId)',
+            'function disconnectCurrentTransport()',
+            'function disconnectPeerTransport(peerId)',
+            'Online works over the internet using a room code',
+            'JOIN ONLINE ROOM',
+            'ROOM CODE:',
+            "multiplayer.transport==='online'?'ONLINE'",
+            "setTimeout(function(){disconnectPeerTransport(peerId)},220)",
+            'ROOM_MAX_PLAYERS=4',
+            'ROOM_BOTS=24',
+            "t:'death_loot'",
+            "joystickStyle:'floating'",
+            'Never read runtime joystick state here',
+            'PLAYER_START_LENGTH=3'
+          ]
+          missing=[x for x in required if x not in html]
+          if missing: raise SystemExit('v4.7 validation failed: '+', '.join(missing))
+          if "if(!joystick.active)joy.style.display='none'" in html:
+              raise SystemExit('Old Android joystick startup crash returned')
+          print('v4.7 online architecture validated')
+          PY
+          node --check /tmp/snake-game.js
+
+      - name: Install browser test dependencies
+        run: npm install --no-save jsdom@24 peerjs@1.5.5 >/dev/null
+
+      - name: Runtime smoke test including online rooms
+        shell: bash
+        run: |
+          cat > smoke-online.cjs <<'EOF'
+          const fs=require('fs');
+          const {JSDOM,VirtualConsole}=require('jsdom');
+          const html=fs.readFileSync('/tmp/game-multiplayer.html','utf8');
+          const errors=[];const vc=new VirtualConsole();
+          vc.on('jsdomError',e=>{if(!String(e.message).includes('Could not load script'))errors.push('jsdomError: '+e.message)});
+          vc.on('error',(...a)=>errors.push('console.error: '+a.join(' ')));
+          const noop=()=>{},gradient={addColorStop:noop};
+          const ctx=new Proxy({canvas:{width:1280,height:720},measureText:t=>({width:String(t).length*7}),createLinearGradient:()=>gradient,createRadialGradient:()=>gradient,createPattern:()=>null,getImageData:()=>({data:new Uint8ClampedArray(4)}),save:noop,restore:noop,beginPath:noop,closePath:noop,moveTo:noop,lineTo:noop,arc:noop,rect:noop,clip:noop,stroke:noop,fill:noop,fillRect:noop,clearRect:noop,drawImage:noop,fillText:noop,setTransform:noop,translate:noop,rotate:noop,scale:noop},{get:(o,p)=>p in o?o[p]:noop,set:(o,p,v)=>(o[p]=v,true)});
+          class FakeConn{
+            constructor(peer){this.peer=peer;this.open=false;this.h={};setTimeout(()=>{this.open=true;this.emit('open')},8)}
+            on(n,f){(this.h[n]||(this.h[n]=[])).push(f);return this}
+            emit(n,v){(this.h[n]||[]).forEach(f=>f(v))}
+            send(v){this.lastSent=v}
+            close(){if(!this.open)return;this.open=false;this.emit('close')}
+          }
+          let guestSeq=0;
+          class FakePeer{
+            constructor(id){this.id=id||('fake-guest-'+(++guestSeq));this.h={};setTimeout(()=>this.emit('open',this.id),8)}
+            on(n,f){(this.h[n]||(this.h[n]=[])).push(f);return this}
+            emit(n,v){(this.h[n]||[]).forEach(f=>f(v))}
+            connect(id){return new FakeConn(id)}
+            destroy(){}
+          }
+          const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://local.snake/',virtualConsole:vc,beforeParse(w){
+            Object.defineProperty(w,'innerWidth',{value:900,writable:true});Object.defineProperty(w,'innerHeight',{value:420,writable:true});Object.defineProperty(w,'devicePixelRatio',{value:1,writable:true});
+            w.HTMLCanvasElement.prototype.getContext=function(){return ctx};w.HTMLCanvasElement.prototype.setPointerCapture=noop;w.HTMLCanvasElement.prototype.releasePointerCapture=noop;w.HTMLElement.prototype.setPointerCapture=noop;w.HTMLElement.prototype.releasePointerCapture=noop;if(!w.PointerEvent)w.PointerEvent=w.MouseEvent;w.Peer=FakePeer;
+          }});
+          const w=dom.window;w.addEventListener('error',e=>errors.push('window.error: '+(e.error?.stack||e.message)));w.addEventListener('unhandledrejection',e=>errors.push('rejection: '+String(e.reason)));const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          (async()=>{
+            await sleep(350);if(errors.length)throw new Error(errors.join('\n'));
+            // Preserve single-player Android startup + touch lifecycle.
+            const play=w.document.querySelector('.playBtn');if(!play)throw new Error('PLAY button missing');play.click();await sleep(420);if(!w.document.querySelector('#gameScreen.active'))throw new Error('Single player did not start');
+            const canvas=w.document.querySelector('#game'),joy=w.document.querySelector('#joystick');canvas.dispatchEvent(new w.PointerEvent('pointerdown',{clientX:120,clientY:300,bubbles:true,pointerId:7}));await sleep(70);if(!joy||joy.style.display==='none')throw new Error('Floating joystick failed');canvas.dispatchEvent(new w.PointerEvent('pointerup',{clientX:140,clientY:290,bubbles:true,pointerId:7}));w.quitToLobby();await sleep(420);
+            // Online host room.
+            w.openLocalMultiplayer();w.selectMultiplayerTransport('online');w.chooseMultiplayerRole('host');const limit=w.document.querySelector('#hostScoreLimit');if(!limit)throw new Error('Online host setup missing');limit.value='15';w.createHostRoom();await sleep(100);
+            if(!w.document.querySelector('#mpBody').textContent.includes('ROOM CODE'))throw new Error('Online room code not shown');
+            const friend={clientId:'FRIEND1',profile:{name:'Friend',body:'#ff7744',head:'#ffaa77',accent:'#fff'}};w.handleJoinRequest(friend,'fake-peer-friend');await sleep(40);if(!w.document.querySelector('#mpBody').textContent.includes('Friend'))throw new Error('Online joined player not rendered');
+            w.hostStartRoomGame();await sleep(280);if(!w.document.querySelector('#gameScreen.active'))throw new Error('Online host match did not start');w.leaveRoomToLobby(false);await sleep(350);
+            // Online guest waiting-room flow.
+            w.openLocalMultiplayer();w.selectMultiplayerTransport('online');w.chooseMultiplayerRole('guest');const code=w.document.querySelector('#onlineRoomCode');if(!code)throw new Error('Online join code input missing');code.value='ABC234';w.joinOnlineRoom();await sleep(100);
+            const me=w.localProfile();w.handleRoomState({roomId:'ABC234',scoreLimit:20,roster:[{id:'HOST1',name:'Host',body:'#55ccff',head:'#88ddff',accent:'#fff',host:true},{id:me.id,name:me.name,body:me.body,head:me.head,accent:me.accent,host:false}]});await sleep(60);if(!w.document.querySelector('#mpBody').textContent.includes('WAITING FOR HOST'))throw new Error('Online guest waiting room failed');
+            w.leaveRoomToLobby(false);await sleep(300);if(errors.length)throw new Error(errors.join('\n'));console.log('ONLINE_MULTIPLAYER_RUNTIME_SMOKE_OK');w.close();
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1;w.close()});
+          EOF
+          node smoke-online.cjs
+
+      - name: Generate Android project
+        shell: bash
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import subprocess,yaml
+          from pathlib import Path
+          wf=yaml.safe_load(Path('.github/workflows/build-snake-arena-v4-multiplayer.yml').read_text())
+          block=next(s['run'] for s in wf['jobs']['build']['steps'] if s.get('name')=='Create Android project')
+          subprocess.run(block,shell=True,executable='/bin/bash',check=True)
+          PY
+          cp /tmp/game-multiplayer.html app/src/main/assets/game.html
+          cp node_modules/peerjs/dist/peerjs.min.js app/src/main/assets/peerjs.min.js
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/com/snakearena/game/MainActivity.java');s=p.read_text()
+          needle='settings.setAllowFileAccess(true);'
+          if needle not in s: raise SystemExit('WebView settings target missing')
+          s=s.replace(needle,needle+'\n                  settings.setAllowFileAccessFromFileURLs(true);\n                  settings.setAllowUniversalAccessFromFileURLs(true);',1)
+          p.write_text(s)
+          PY
+          sed -i "s/versionCode 17/versionCode 22/" app/build.gradle
+          sed -i "s/versionName '4.2.0'/versionName '4.7.0'/" app/build.gradle
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Package and verify APK
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v4.7-online-multiplayer.apk
+          unzip -t Snake-Arena-IO-v4.7-online-multiplayer.apk >/dev/null
+          unzip -l Snake-Arena-IO-v4.7-online-multiplayer.apk | grep -q 'assets/peerjs.min.js'
+          test -s Snake-Arena-IO-v4.7-online-multiplayer.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snake-Arena-IO-v4.7-Online-Multiplayer-APK
+          path: Snake-Arena-IO-v4.7-online-multiplayer.apk
+          if-no-files-found: error
