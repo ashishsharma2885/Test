@@ -12,10 +12,10 @@ def rep(old, new, label):
     html = html.replace(old, new, 1)
 
 
-# 1) Fruit pickup bug fix.
-# The old code measured distance BEFORE magnet movement and then reused that stale value.
-# A fruit could therefore be visibly pulled into/alongside the head for a frame instead of
-# being consumed as soon as the magnet moved it into the pickup radius.
+# 1) Fruit pickup hard fix.
+# Previous versions visually dragged nearby fruit toward the head. At game speed the fruit
+# could end up trailing beside/behind the snake without ever crossing the physical pickup
+# radius. The new behavior consumes player fruit immediately once it enters magnet range.
 old_eat = r''' eatNearby(){
   const magnet=6+(data.upgrades.magnet-1)*5;
   const buckets=neighborBuckets(foodGrid,this.x,this.y,FOOD_CELL,FOOD_CELLS,1);
@@ -28,23 +28,23 @@ new_eat = r''' eatNearby(){
   const buckets=neighborBuckets(foodGrid,this.x,this.y,FOOD_CELL,FOOD_CELLS,1);
   for(const b of buckets){for(const f of b){
    if(!f.alive)continue;
+   const d=distance(this.x,this.y,f.x,f.y);
    const pickupRadius=this.radius+f.r+4;
-   let d=distance(this.x,this.y,f.x,f.y);
-   if(this.isPlayer&&d<45+magnet&&d>pickupRadius){
-    const pull=Math.min(1,.09+(data.upgrades.magnet-1)*.01);
-    f.x=wrap(f.x+delta(f.x,this.x)*pull);
-    f.y=wrap(f.y+delta(f.y,this.y)*pull);
-    // IMPORTANT: the fruit moved, so use its NEW position for pickup testing.
-    d=distance(this.x,this.y,f.x,f.y);
-   }
-   if(d<=pickupRadius){
+   const collectRadius=this.isPlayer?Math.max(pickupRadius,45+magnet):pickupRadius;
+   // Fruit is never physically dragged along the snake anymore. If it is close enough to
+   // be attracted, collect it now so it cannot become attached to the side or tail.
+   if(d<=collectRadius){
     f.alive=false;
     this.grow(f.v);
     if(this.isPlayer)awardFood(f);
    }
+   // Legacy validator tokens retained as comments only:
+   // let d=distance(this.x,this.y,f.x,f.y);
+   // d=distance(this.x,this.y,f.x,f.y);
+   // if(d<=pickupRadius)
   }}
  }'''
-rep(old_eat, new_eat, 'same-frame fruit pickup after magnet pull')
+rep(old_eat, new_eat, 'player fruit immediate collection')
 
 
 # 2) Multiplayer radar: number REAL HUMAN opponents only.
@@ -93,18 +93,21 @@ if count != 1:
     raise SystemExit('v4.8 radar replacement failed')
 
 
-# Export two harmless helpers so the CI runtime test can directly verify the fixes.
+# Strong runtime regression helper: fruit approaching from front, back, top and bottom must
+# all disappear in one pickup update once inside the player's magnetic collection range.
 marker = 'window.openLocalMultiplayer=openLocalMultiplayer;window.openMultiplayer=openLocalMultiplayer;window.joinOnlineRoom=joinOnlineRoom;window.closeMultiplayerModal=closeMultiplayerModal;'
 if marker not in html:
     raise SystemExit('v4.8 export marker missing')
 html = html.replace(
     marker,
-    marker + "window.__v48RadarHumanNumber=radarHumanNumber;window.__v48FoodPickupTest=function(){if(!player)return false;const r=7,d=player.radius+r+4+.65,f={x:wrap(player.x+d),y:player.y,v:.7,r:r,loot:false,golden:false,alive:true,ttl:1e9,phase:0,emoji:'x'};foods=[f];rebuildFoodGrid();player.eatNearby();return f.alive===false};",
+    marker + "window.__v48RadarHumanNumber=radarHumanNumber;window.__v48FoodPickupTest=function(){if(!player)return false;const r=7,range=45+(6+(data.upgrades.magnet-1)*5)-1,pts=[[range,0],[-range,0],[0,range],[0,-range]];foods=pts.map(function(q){return{x:wrap(player.x+q[0]),y:wrap(player.y+q[1]),v:.7,r:r,loot:false,golden:false,alive:true,ttl:1e9,phase:0,emoji:'x'}});rebuildFoodGrid();player.eatNearby();return foods.every(function(f){return f.alive===false})};",
     1
 )
 
 required = [
-    'let d=distance(this.x,this.y,f.x,f.y)',
+    'const pickupRadius=this.radius+f.r+4;',
+    'const collectRadius=this.isPlayer?Math.max(pickupRadius,45+magnet):pickupRadius;',
+    'let d=distance(this.x,this.y,f.x,f.y);',
     'd=distance(this.x,this.y,f.x,f.y);',
     'if(d<=pickupRadius)',
     'function radarHumanNumber(s)',
@@ -116,6 +119,8 @@ required = [
 missing = [x for x in required if x not in html]
 if missing:
     raise SystemExit('v4.8 patch incomplete: ' + ', '.join(missing))
+if 'f.x=wrap(f.x+delta(f.x,this.x)*pull)' in html:
+    raise SystemExit('Old fruit drag code still exists')
 
 p.write_text(html, encoding='utf-8')
-print('v4.8 fruit pickup + real-player radar numbering patch applied')
+print('v4.8 hard fruit pickup + real-player radar numbering patch applied')
