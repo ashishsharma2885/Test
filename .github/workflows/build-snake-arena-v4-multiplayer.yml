@@ -1,4 +1,4 @@
-name: Build Snake Arena Local Multiplayer APK
+name: Build Snake Arena Room Multiplayer APK
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Apply multiplayer patch
+      - name: Apply multiplayer room patch
         run: python3 snake-arena-v3/apply_multiplayer_patch.py
 
       - name: Create Android project
@@ -60,7 +60,7 @@ jobs:
                   mavenCentral()
               }
           }
-          rootProject.name = 'SnakeArenaLocalMultiplayer'
+          rootProject.name = 'SnakeArenaRoomMultiplayer'
           include ':app'
           EOF
 
@@ -89,8 +89,8 @@ jobs:
                   applicationId 'com.snakearena.game'
                   minSdk 24
                   targetSdk 35
-                  versionCode 16
-                  versionName '4.0.0'
+                  versionCode 17
+                  versionName '4.2.0'
               }
 
               buildTypes {
@@ -372,7 +372,7 @@ jobs:
           PY
           node --check /tmp/snake-game.js
 
-      - name: Validate multiplayer structure
+      - name: Validate multiplayer room structure
         shell: bash
         run: |
           python3 - <<'PY'
@@ -380,32 +380,36 @@ jobs:
           html=Path('app/src/main/assets/game.html').read_text()
           java=Path('app/src/main/java/com/snakearena/game/LocalNetworkBridge.java').read_text()
           required_html=[
-            'Local Multiplayer','hostWifiGame()','joinWifiGame()',
-            'hostBluetoothGame()','joinBluetoothGame()',
-            'function onLocalNetEvent(raw)','function beginLocalRound(packet,role)',
-            'function localMultiplayerCollisionCheck()','function sendLocalState(now,force)',
-            'PLAYER_START_LENGTH=3','GAME_STATE=Object.freeze'
+            'Local Multiplayer','Wi-Fi / Hotspot','Bluetooth','HOST ROOM','JOIN ROOM',
+            'Players in Room','Only the host can start','function hostStartRoomGame()',
+            'function roomCollisionCheck()','function sendRoomSnapshot(now,force)',
+            'function handlePlayerState(packet,peerId)','AI_KILL_POINTS=1','PLAYER_KILL_POINTS=3',
+            'ROOM_MAX_PLAYERS=4','PLAYER_START_LENGTH=3','window.onLocalNetEvent=onLocalNetEvent'
           ]
-          required_java=['hostWifi()','joinWifi(String host)','hostBluetooth()','joinBluetooth(String address)','@JavascriptInterface','BluetoothSocket','ServerSocket']
+          required_java=[
+            'hostWifi()','joinWifi(String host)','hostBluetooth()','joinBluetooth(String address)',
+            'sendTo(String peerId, String message)','disconnectPeer(String peerId)',
+            'MAX_REMOTE_PLAYERS = 3','peer_connected','BluetoothServerSocket','ServerSocket'
+          ]
           missing=[x for x in required_html if x not in html]+[x for x in required_java if x not in java]
-          if missing: raise SystemExit('Missing multiplayer pieces: '+', '.join(missing))
-          print('Local multiplayer structure validated')
+          if missing: raise SystemExit('Missing room multiplayer pieces: '+', '.join(missing))
+          print('Room multiplayer structure validated')
           PY
 
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v4.0-local-multiplayer.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v4.2-room-multiplayer.apk
 
       - name: Verify APK
         run: |
-          unzip -t Snake-Arena-IO-v4.0-local-multiplayer.apk >/dev/null
-          test -s Snake-Arena-IO-v4.0-local-multiplayer.apk
+          unzip -t Snake-Arena-IO-v4.2-room-multiplayer.apk >/dev/null
+          test -s Snake-Arena-IO-v4.2-room-multiplayer.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Snake-Arena-IO-v4.0-Local-Multiplayer-APK
-          path: Snake-Arena-IO-v4.0-local-multiplayer.apk
+          name: Snake-Arena-IO-v4.2-Room-Multiplayer-APK
+          path: Snake-Arena-IO-v4.2-room-multiplayer.apk
           if-no-files-found: error
