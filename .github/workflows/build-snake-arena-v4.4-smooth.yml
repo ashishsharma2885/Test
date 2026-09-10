@@ -1,0 +1,99 @@
+name: Build Snake Arena v4.4 Smooth APK
+
+on:
+  push:
+    branches:
+      - snake-arena-apk-build
+    paths:
+      - 'snake-arena-v3/apply_v44_smooth_patch.py'
+      - '.github/workflows/build-snake-arena-v4.4-smooth.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Apply room loot and smooth patches
+        run: |
+          python3 snake-arena-v3/apply_multiplayer_patch.py
+          python3 snake-arena-v3/apply_multiplayer_loot_fix.py
+          python3 snake-arena-v3/apply_v44_smooth_patch.py
+
+      - name: Generate Android project
+        shell: bash
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import subprocess, yaml
+          from pathlib import Path
+          wf=yaml.safe_load(Path('.github/workflows/build-snake-arena-v4-multiplayer.yml').read_text())
+          steps=wf['jobs']['build']['steps']
+          block=next(s['run'] for s in steps if s.get('name')=='Create Android project')
+          subprocess.run(block, shell=True, executable='/bin/bash', check=True)
+          PY
+          sed -i "s/versionCode 17/versionCode 19/" app/build.gradle
+          sed -i "s/versionName '4.2.0'/versionName '4.4.0'/" app/build.gradle
+
+      - name: Validate JavaScript and smooth fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('app/src/main/assets/game.html').read_text()
+          scripts=re.findall(r'<script>([\s\S]*?)</script>',html)
+          if not scripts: raise SystemExit('No game script found')
+          js='\n'.join(scripts)
+          Path('/tmp/snake-game.js').write_text(js)
+          required=[
+            'this.spacing=4',
+            'pathSteps=Math.max(1,Math.ceil(moveDistance/2.2))',
+            "const isBoosting=s.isPlayer?!!boost",
+            "ctx.fillStyle='#b7fbff'",
+            'networkBoosting=!!t.b',
+            'function trackAutoPerformance(now)',
+            'const ranked=snakes.slice()',
+            "t:'death_loot'",
+            'function spawnRoomDeathLoot(victim)',
+            'ROOM_MAX_PLAYERS=4',
+            'PLAYER_START_LENGTH=3'
+          ]
+          missing=[x for x in required if x not in html]
+          if missing: raise SystemExit('v4.4 validation failed: '+', '.join(missing))
+          if 'this.spacing=6' in html: raise SystemExit('Old loose body spacing still present')
+          print('v4.4 structure validated')
+          PY
+          node --check /tmp/snake-game.js
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Package and verify APK
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk Snake-Arena-IO-v4.4-smooth.apk
+          unzip -t Snake-Arena-IO-v4.4-smooth.apk >/dev/null
+          test -s Snake-Arena-IO-v4.4-smooth.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snake-Arena-IO-v4.4-Smooth-APK
+          path: Snake-Arena-IO-v4.4-smooth.apk
+          if-no-files-found: error
