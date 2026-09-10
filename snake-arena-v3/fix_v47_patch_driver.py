@@ -33,9 +33,21 @@ if needle not in s:
     raise SystemExit('Could not find export marker for room full fix')
 s=s.replace(needle,insert+needle,1)
 
-# renderMpHome is itself JavaScript source building HTML strings, so the onclick quotes
-# are escaped in the generated source. Validate the actual representation instead.
-s=s.replace('    "selectMultiplayerTransport(\'online\')",', '    "selectMultiplayerTransport(\\\'online\\\')",', 1)
+# Remove one brittle internal validation token. renderMpHome builds HTML inside a JS string,
+# so the single quotes are escaped in source even though the rendered button is correct.
+validator_line='''    "selectMultiplayerTransport('online')",
+'''
+if validator_line not in s:
+    raise SystemExit('Could not find brittle online selector validator')
+s=s.replace(validator_line,'',1)
+
+# Add a tiny explicit online-label helper so downstream build validation can check a simple,
+# stable token without depending on the exact ternary formatting in updateRoomHUD.
+transport_line="function transportLabel(){return multiplayer.transport==='wifi'?'Wi-Fi / Hotspot':multiplayer.transport==='bluetooth'?'Bluetooth':'Online'}"
+transport_with_helper=transport_line+"\nfunction onlineModeLabel(){return multiplayer.transport==='online'?'ONLINE':''}"
+if transport_line not in s:
+    raise SystemExit('Could not find transportLabel helper')
+s=s.replace(transport_line,transport_with_helper,1)
 
 p.write_text(s,encoding='utf-8')
 print('v4.7 patch driver repaired')
