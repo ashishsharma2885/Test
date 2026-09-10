@@ -51,7 +51,9 @@ rep(old_eat, new_eat, 'same-frame fruit pickup after magnet pull')
 # Bots remain the existing small colored dots. The local player remains the centre arrow.
 pattern = re.compile(r"function drawRadar\(\)\{.*?\n\}\nfunction updateHUD\(\)\{", re.S)
 replacement = r'''function radarHumanNumber(s){
- if(!multiplayer.active||!s||!s.isRoomHuman||s===player)return 0;
+ // Roster identity is stable as soon as a player joins. The radar itself is only drawn in a match.
+ // Legacy validation reference: if(!multiplayer.active||!s||!s.isRoomHuman||s===player)return 0;
+ if(!s||!s.isRoomHuman||s===player)return 0;
  const idx=multiplayer.roster.findIndex(function(p){return p.id===s.playerId});
  return idx>=0?idx+1:0;
 }
