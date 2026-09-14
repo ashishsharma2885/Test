@@ -39,8 +39,8 @@ rep(
 # Bots are a little more willing to boost while pursuing a combat target.
 # Existing energy/boost limits still apply, so this does not create permanent boost.
 rep(
-"   if(this.ai.target&&this.ai.target.type==='combat'&&this.energy>cfg.boostEnergy&&Math.random()<cfg.boostChance){",
-"   if(this.ai.target&&this.ai.target.type==='combat'&&this.energy>cfg.boostEnergy&&Math.random()<Math.min(.96,cfg.boostChance+.08)){",
+"  if(this.ai.boostTimer<=0){\n   this.ai.boosting=(p.type==='combat'||p.type==='food')&&\n     Math.random()<cfg.boostChance&&this.energy>cfg.boostEnergy&&dToTarget>190;\n   this.ai.boostTimer=rand(.45,.9);\n  }",
+"  if(this.ai.boostTimer<=0){\n   const botBoostChance=p.type==='combat'?Math.min(.96,cfg.boostChance+.10):cfg.boostChance;\n   this.ai.boosting=(p.type==='combat'||p.type==='food')&&\n     Math.random()<botBoostChance&&this.energy>cfg.boostEnergy&&dToTarget>190;\n   this.ai.boostTimer=rand(.42,.82);\n  }",
 'combat boost pressure')
 
 # -----------------------------------------------------------------------------
@@ -67,7 +67,6 @@ window.__v53BotTuningTest=function(){
 marker = 'window.__v52UiState='
 idx = html.find(marker)
 if idx < 0:
-    # Fall back to the final script close if helper naming changes later.
     idx = html.rfind('</script>')
     if idx < 0:
         raise SystemExit('v5.3 target missing: runtime helper insertion')
@@ -80,6 +79,7 @@ required = [
     'aggression:.82,boostChance:.58',
     'aggression:.92,boostChance:.84',
     '(other.isPlayer?45:300)',
+    'const botBoostChance=',
     'value*1.28',
     "Math.max(this.isPlayer?.38:.45,base)",
     'window.__v53BotTuningTest=function()'
