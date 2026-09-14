@@ -1,0 +1,168 @@
+name: Build Snake IO by Ashish v5.3 Bot Battle APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [snake-arena-apk-build]
+    paths:
+      - 'snake-arena-v3/apply_v53_bot_battle_growth.py'
+      - '.github/workflows/build-snake-io-v5.3-bot-battle.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Generate v5.3 game
+        run: |
+          python3 snake-arena-v3/fix_v47_patch_driver.py
+          python3 snake-arena-v3/apply_multiplayer_patch.py
+          python3 snake-arena-v3/apply_multiplayer_loot_fix.py
+          python3 snake-arena-v3/apply_v44_smooth_patch.py
+          python3 snake-arena-v3/apply_v45_controls_world_patch.py
+          python3 snake-arena-v3/apply_v46_android_runtime_fix.py
+          python3 snake-arena-v3/apply_v47_online_multiplayer.py
+          python3 snake-arena-v3/apply_v48_food_radar_fix.py
+          python3 snake-arena-v3/apply_v49_magnet_balance.py
+          python3 snake-arena-v3/apply_v50_stable_release.py
+          python3 snake-arena-v3/prepare_v51_zonal_targets.py
+          python3 snake-arena-v3/apply_v51_zonal_mode.py
+          python3 snake-arena-v3/apply_v51_test_hooks.py
+          python3 snake-arena-v3/apply_v52_simple_ui.py
+          python3 snake-arena-v3/apply_v53_bot_battle_growth.py
+
+      - name: Validate JavaScript and bot tuning
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('/tmp/game-multiplayer.html').read_text()
+          scripts=re.findall(r'<script(?:\s[^>]*)?>([\s\S]*?)</script>',html)
+          inline=[s for s in scripts if s.strip()]
+          if not inline: raise SystemExit('No inline game script found')
+          js='\n'.join(inline)
+          Path('/tmp/snake-game.js').write_text(js)
+          required=[
+            'aggression:.70,boostChance:.32',
+            'aggression:.82,boostChance:.58',
+            'aggression:.92,boostChance:.84',
+            '(other.isPlayer?45:300)',
+            'const botBoostChance=',
+            'value*1.28',
+            'Math.max(this.isPlayer?.38:.45,base)',
+            'window.__v53BotTuningTest=function()',
+            'class="bottomNav simpleBottomNav"',
+            'id="playGameBtn"',
+            'function safeStartMatch()',
+            'id="mode-infinite"',
+            'id="mode-zonal"',
+            'while(snakes.length>50)snakes.pop()',
+            'function updateZonalMode(dt)',
+            'placementCoins=1000;run.xp+=500',
+            '<script src="peerjs.min.js"></script>',
+            'id="bootSplash"'
+          ]
+          missing=[x for x in required if x not in html]
+          if missing: raise SystemExit('v5.3 validation failed: '+', '.join(missing))
+          if 'f.x=wrap(f.x+delta(f.x,this.x)*pull)' in html:
+            raise SystemExit('Fruit dragging returned')
+          print('v5.3 AI battle/growth source validation passed')
+          PY
+          node --check /tmp/snake-game.js
+
+      - name: Install browser test dependencies
+        run: npm install --no-save jsdom@24 peerjs@1.5.5 >/dev/null
+
+      - name: Runtime bot battle smoke test
+        shell: bash
+        run: |
+          cat > smoke-v53.cjs <<'EOF'
+          const fs=require('fs');
+          const {JSDOM,VirtualConsole}=require('jsdom');
+          const html=fs.readFileSync('/tmp/game-multiplayer.html','utf8');
+          const errors=[];const vc=new VirtualConsole();
+          vc.on('jsdomError',e=>{if(!String(e.message).includes('Could not load script'))errors.push('jsdomError: '+e.message)});
+          vc.on('error',(...a)=>errors.push('console.error: '+a.join(' ')));
+          const noop=()=>{},gradient={addColorStop:noop};
+          const ctx=new Proxy({canvas:{width:1280,height:720},measureText:t=>({width:String(t).length*7}),createLinearGradient:()=>gradient,createRadialGradient:()=>gradient,createPattern:()=>null,getImageData:()=>({data:new Uint8ClampedArray(4)}),save:noop,restore:noop,beginPath:noop,closePath:noop,moveTo:noop,lineTo:noop,arc:noop,rect:noop,clip:noop,stroke:noop,fill:noop,fillRect:noop,clearRect:noop,drawImage:noop,fillText:noop,setTransform:noop,translate:noop,rotate:noop,scale:noop,strokeRect:noop},{get:(o,p)=>p in o?o[p]:noop,set:(o,p,v)=>(o[p]=v,true)});
+          class FakeConn{constructor(peer){this.peer=peer;this.open=false;this.h={};setTimeout(()=>{this.open=true;this.emit('open')},8)}on(n,f){(this.h[n]||(this.h[n]=[])).push(f);return this}emit(n,v){(this.h[n]||[]).forEach(f=>f(v))}send(v){this.lastSent=v}close(){if(!this.open)return;this.open=false;this.emit('close')}}
+          let seq=0;class FakePeer{constructor(id){this.id=id||('fake-'+(++seq));this.h={};setTimeout(()=>this.emit('open',this.id),8)}on(n,f){(this.h[n]||(this.h[n]=[])).push(f);return this}emit(n,v){(this.h[n]||[]).forEach(f=>f(v))}connect(id){return new FakeConn(id)}destroy(){}}
+          const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://local.snake/',virtualConsole:vc,beforeParse(w){Object.defineProperty(w,'innerWidth',{value:860,writable:true});Object.defineProperty(w,'innerHeight',{value:390,writable:true});Object.defineProperty(w,'devicePixelRatio',{value:1,writable:true});w.HTMLCanvasElement.prototype.getContext=function(){return ctx};w.HTMLCanvasElement.prototype.setPointerCapture=noop;w.HTMLCanvasElement.prototype.releasePointerCapture=noop;w.HTMLElement.prototype.setPointerCapture=noop;w.HTMLElement.prototype.releasePointerCapture=noop;if(!w.PointerEvent)w.PointerEvent=w.MouseEvent;w.Peer=FakePeer;}});
+          const w=dom.window;w.addEventListener('error',e=>errors.push('window.error: '+(e.error?.stack||e.message)));w.addEventListener('unhandledrejection',e=>errors.push('rejection: '+String(e.reason)));const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          (async()=>{
+            await sleep(250);if(errors.length)throw new Error(errors.join('\n'));
+            await sleep(2200);
+            const play=w.document.querySelector('#playGameBtn');if(!play)throw new Error('Play button missing');
+            w.setGameMode('infinite');play.click();await sleep(150);
+            if(typeof w.__v53BotTuningTest!=='function'||!w.__v53BotTuningTest())throw new Error('v5.3 bot growth/tuning runtime check failed');
+            if(errors.length)throw new Error(errors.join('\n'));
+            w.quitToLobby();await sleep(760);
+            w.setGameMode('zonal');play.click();await sleep(140);
+            const st=w.__v51State();
+            if(!st.zoneActive||st.totalSnakes!==50)throw new Error('Zonal 50-snake mode regressed: '+JSON.stringify(st));
+            if(typeof w.__v53BotTuningTest!=='function'||!w.__v53BotTuningTest())throw new Error('v5.3 tuning missing in Zonal');
+            if(errors.length)throw new Error(errors.join('\n'));
+            console.log('V53_BOT_BATTLE_RUNTIME_OK');w.close();
+          })().catch(e=>{console.error(e.stack||e);process.exitCode=1;w.close()});
+          EOF
+          node smoke-v53.cjs
+
+      - name: Generate Android project
+        shell: bash
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import subprocess,yaml
+          from pathlib import Path
+          wf=yaml.safe_load(Path('.github/workflows/build-snake-arena-v4-multiplayer.yml').read_text())
+          block=next(s['run'] for s in wf['jobs']['build']['steps'] if s.get('name')=='Create Android project')
+          subprocess.run(block,shell=True,executable='/bin/bash',check=True)
+          PY
+          cp /tmp/game-multiplayer.html app/src/main/assets/game.html
+          cp node_modules/peerjs/dist/peerjs.min.js app/src/main/assets/peerjs.min.js
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/com/snakearena/game/MainActivity.java');s=p.read_text()
+          needle='settings.setAllowFileAccess(true);'
+          if needle not in s: raise SystemExit('WebView settings target missing')
+          s=s.replace(needle,needle+'\n                  settings.setAllowFileAccessFromFileURLs(true);\n                  settings.setAllowUniversalAccessFromFileURLs(true);',1)
+          p.write_text(s)
+          strings=Path('app/src/main/res/values/strings.xml')
+          if strings.exists(): strings.write_text(strings.read_text().replace('Snake Arena IO','Snake IO by Ashish'))
+          PY
+          sed -i "s/versionCode 17/versionCode 29/" app/build.gradle
+          sed -i "s/versionName '4.2.0'/versionName '5.3.0'/" app/build.gradle
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Package and verify APK
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk Snake-IO-by-Ashish-v5.3-bot-battle.apk
+          unzip -t Snake-IO-by-Ashish-v5.3-bot-battle.apk >/dev/null
+          unzip -l Snake-IO-by-Ashish-v5.3-bot-battle.apk | grep -q 'assets/peerjs.min.js'
+          test -s Snake-IO-by-Ashish-v5.3-bot-battle.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snake-IO-by-Ashish-v5.3-Bot-Battle-APK
+          path: Snake-IO-by-Ashish-v5.3-bot-battle.apk
+          if-no-files-found: error
