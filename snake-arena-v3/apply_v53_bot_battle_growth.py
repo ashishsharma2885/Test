@@ -10,12 +10,6 @@ def rep(old, new, label, count=1):
         raise SystemExit(f'v5.3 target missing: {label}')
     html = html.replace(old, new, count)
 
-# -----------------------------------------------------------------------------
-# 1) Make AI much more willing to fight other AI snakes.
-# Keep Easy/Normal/Hard distinct, but increase combat frequency in every mode.
-# Player-threat stays lower than bot-vs-bot preference so the arena feels alive
-# instead of all bots unfairly focusing the human player.
-# -----------------------------------------------------------------------------
 rep(
 "  speed:.86,turn:.78,decisionMin:.34,decisionMax:.62,avoidRange:82,\n  aggression:.38,boostChance:.18,boostEnergy:.42,combatRange:760,\n  combatLead:130,combatOffset:115,playerThreat:.08,easyCrashBonus:5",
 "  speed:.88,turn:.82,decisionMin:.24,decisionMax:.45,avoidRange:86,\n  aggression:.70,boostChance:.32,boostEnergy:.38,combatRange:920,\n  combatLead:145,combatOffset:108,playerThreat:.04,easyCrashBonus:5",
@@ -29,32 +23,22 @@ rep(
 "  speed:1.14,turn:1.24,decisionMin:.09,decisionMax:.21,avoidRange:154,\n  aggression:.92,boostChance:.84,boostEnergy:.18,combatRange:1320,\n  combatLead:225,combatOffset:76,playerThreat:.28,easyCrashBonus:0",
 'hard bot combat tuning')
 
-# When several targets are available, strongly prefer another AI snake over the
-# human player. This creates visible AI-vs-AI battles across the whole arena.
 rep(
 "     let score=(cfg.combatRange-d)+(other.isPlayer?80:145)+rand(-90,90);",
 "     let score=(cfg.combatRange-d)+(other.isPlayer?45:300)+rand(-65,65);",
 'prefer AI opponents')
 
-# Bots are a little more willing to boost while pursuing a combat target.
-# Existing energy/boost limits still apply, so this does not create permanent boost.
 rep(
 "  if(this.ai.boostTimer<=0){\n   this.ai.boosting=(p.type==='combat'||p.type==='food')&&\n     Math.random()<cfg.boostChance&&this.energy>cfg.boostEnergy&&dToTarget>190;\n   this.ai.boostTimer=rand(.45,.9);\n  }",
 "  if(this.ai.boostTimer<=0){\n   const botBoostChance=p.type==='combat'?Math.min(.96,cfg.boostChance+.10):cfg.boostChance;\n   this.ai.boosting=(p.type==='combat'||p.type==='food')&&\n     Math.random()<botBoostChance&&this.energy>cfg.boostEnergy&&dToTarget>190;\n   this.ai.boostTimer=rand(.42,.82);\n  }",
 'combat boost pressure')
 
-# -----------------------------------------------------------------------------
-# 2) Faster AI growth from fruit and death-loot.
-# Player growth balance is untouched. Bots now gain ~56% more length per food
-# value than before, which lets successful AI fighters become visibly larger.
-# -----------------------------------------------------------------------------
 rep(
 "  const base=this.isPlayer?value*.95*stage*upgrade:value*.82;\n  const growth=Math.max(this.isPlayer?.38:.30,base);",
 "  const base=this.isPlayer?value*.95*stage*upgrade:value*1.28;\n  const growth=Math.max(this.isPlayer?.38:.45,base);",
 'faster bot growth')
 
-# Lightweight runtime hook used only by CI to verify that the generated game has
-# a live bot and that its growth/tuning is actually active after starting a match.
+# Insert the CI hook beside the existing v5.1 runtime hook, inside the main game IIFE.
 insert = r'''
 window.__v53BotTuningTest=function(){
  const bot=snakes.find(function(s){return s&&!s.isPlayer&&s.alive});
@@ -64,15 +48,11 @@ window.__v53BotTuningTest=function(){
  return delta>=1.27&&e.aggression>=.69&&m.aggression>=.81&&h.aggression>=.91&&m.playerThreat<=.13&&m.combatRange>=1070;
 };
 '''
-marker = 'window.__v52UiState='
-idx = html.find(marker)
-if idx < 0:
-    idx = html.rfind('</script>')
-    if idx < 0:
-        raise SystemExit('v5.3 target missing: runtime helper insertion')
-    html = html[:idx] + insert + '\n' + html[idx:]
-else:
-    html = html[:idx] + insert + '\n' + html[idx:]
+marker='window.handleAndroidBack=function(){'
+if marker not in html:
+    raise SystemExit('v5.3 target missing: scoped runtime helper marker')
+if 'window.__v53BotTuningTest=' not in html:
+    html=html.replace(marker,insert+'\n'+marker,1)
 
 required = [
     'aggression:.70,boostChance:.32',
